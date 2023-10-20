@@ -13,8 +13,12 @@ import { createApp } from 'vue'
 // Plugins
 import { registerPlugins } from '@/plugins'
 
+// Config
+import appConfig from '@/config'
+//console.log(appConfig)
+//const config = {}
 const app = createApp(App)
 
-registerPlugins(app)
+registerPlugins(app, appConfig)
 
 app.mount('#app')

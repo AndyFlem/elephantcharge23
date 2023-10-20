@@ -7,4 +7,9 @@ module.exports = {
     'plugin:vue/vue3-essential',
     'eslint:recommended',
   ],
+  "rules": {
+    "vue/no-unused-vars": ["error", {
+      "ignorePattern": "^_"
+    }]
+  },  
 }

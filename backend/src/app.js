@@ -11,7 +11,7 @@ const cors = require('cors')
 const path = require('path')
 
 const corsOptions = {
-  origin: config.cors_origin,
+  //origin: config.cors_origin,
   credentials: true,
   optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
 }
