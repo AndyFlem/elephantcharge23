@@ -14,7 +14,7 @@ module.exports = {
   index (req, res) {
     Common.debug(req, 'index')
 
-    Knex('charge')
+    Knex('v_charge')
       .select()
       .then(charges => res.send(charges))
       .catch(err => {

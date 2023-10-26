@@ -24,7 +24,7 @@
       <v-col class="" cols="12" sm="6">
         <v-card
           class="mx-auto" prepend-icon="mdi-home">
-          <template v-slot:title>Charges</template>
+          <template v-slot:title><router-link to="charges">Charges</router-link></template>
           <v-card-text>
             This is content
           </v-card-text>
@@ -33,7 +33,7 @@
       <v-col class="" cols="12" sm="6">
         <v-card
           class="mx-auto" prepend-icon="mdi-home">
-          <template v-slot:title>Teams</template>
+          <template v-slot:title><router-link to="teams">Teams</router-link></template>
           <v-card-text>
             This is content
           </v-card-text>

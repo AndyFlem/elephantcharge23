@@ -25,10 +25,10 @@
           nav
         >
           <v-list-item prepend-icon="mdi-view-dashboard" to="/">Home</v-list-item>
-          <v-list-item prepend-icon="mdi-view-dashboard" to="charges">Charges</v-list-item>
-          <v-list-item prepend-icon="mdi-view-dashboard" to="teams">Teams</v-list-item>
-          <v-list-item prepend-icon="mdi-view-dashboard" to="cars">Cars</v-list-item>
-          <v-list-item prepend-icon="mdi-view-dashboard" to="sponsors">Sponsors</v-list-item>
+          <v-list-item prepend-icon="mdi-view-dashboard" to="/charges">Charges</v-list-item>
+          <v-list-item prepend-icon="mdi-view-dashboard" to="/teams">Teams</v-list-item>
+          <v-list-item prepend-icon="mdi-view-dashboard" to="/cars">Cars</v-list-item>
+          <v-list-item prepend-icon="mdi-view-dashboard" to="/sponsors">Sponsors</v-list-item>
         </v-list>
   </v-navigation-drawer>
 </template>

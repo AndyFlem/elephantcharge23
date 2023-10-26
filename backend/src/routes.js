@@ -16,6 +16,7 @@ module.exports = (app) => {
     
     app.get(prefix + '/charge/:charge_ref/entries', EntryController.index)
     app.get(prefix + '/charge/:charge_ref/entry/:car_no', EntryController.show)
+    app.get(prefix + '/entry/:entry_id', EntryController.showById)
     app.put(prefix + '/entry/:entry_id', EntryController.update)
     app.put(prefix + '/entry/:entry_id/clear_result', EntryController.clearResult)
     app.get(prefix + '/entry/:entry_id/legs', EntryController.legs)

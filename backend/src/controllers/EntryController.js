@@ -6,6 +6,12 @@ const Common = require('./CommonDebug')('Entry')
 
 const ChargeCommon = require('./ChargeCommon')
 
+//NOT_PROCESSED
+//RAW
+//CLEAN
+//CHECKINS
+//LEGS
+
 module.exports = {
   // =======================
   // READ
@@ -44,7 +50,27 @@ module.exports = {
       res.status(500).send({ error: 'An error has occured trying fetch the entry: ' + err })
     })
   },
-  
+  showById (req, res) {
+    Common.debug(req, 'showById')
+
+    let entry
+
+    Knex.transaction(function (trx) {
+      return module.exports.getEntry(req, trx, req.params.entry_id)  
+        .then(ent => {
+          entry = ent
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(() => {
+      res.send(entry)
+    })
+    .catch(err => {
+      Common.error(req, 'showById', err)
+      res.status(500).send({ error: 'An error has occured trying fetch the entry: ' + err })
+    })
+  }, 
   entriesForCharge (req, trx, chargeId) {
     Common.debug(req, 'entriesForCharge', 'ChargeId: ' + chargeId )
 
@@ -194,15 +220,16 @@ module.exports = {
     let charge
 
     let distances={ 
-      'TOTAL':0,
-      'GAUNTLET':0,
-      'NON_GAUNTLET':0,
-      'TSETSE_1':0,
-      'TSETSE_2':0,
-      'GAUNTLET_PENALTIES':0,
-      'PENALTIES':0,
-      'GAUNTLET_COMPETITION':0,
-      'TOTAL_COMPETITION':0,
+      'TOTAL': 0,
+      'GAUNTLET': 0,
+      'NON_GAUNTLET': 0,
+      'TSETSE_1': 0,
+      'TSETSE_2': 0,
+      'GAUNTLET_PENALTIES': 0,
+      'PENALTIES': 0,
+      'GAUNTLET_COMPETITION': 0,
+      'TOTAL_COMPETITION': 0,
+      'NET': null
     }
 
     return Knex('entry_distance')
@@ -240,14 +267,18 @@ module.exports = {
         distances.PENALTIES = entry.dist_penalty_nongauntlet
 
         distances.GAUNTLET_COMPETITION = charge.gauntlet_multiplier * (distances.GAUNTLET + distances.GAUNTLET_PENALTIES)
-        distances.TOTAL_COMPETITION  = distances.GAUNTLET_COMPETITION + distances.PENALTIES + distances.NON_GAUNTLET
+        distances.TOTAL_COMPETITION = distances.GAUNTLET_COMPETITION + distances.PENALTIES + distances.NON_GAUNTLET
         
-        let distInserts = Object.keys(distances).map(distKey=>{
+        if (entry.result_status == 'COMPLETE') {
+          distances.NET = distances.TOTAL_COMPETITION - (charge.m_per_local * entry.raised_local)
+        }
+
+        let distInserts = Object.keys(distances).filter(distKey=>distances[distKey]).map(distKey=>{ 
           return Knex('entry_distance')
             .insert({
               'entry_id': entryId,
               'distance_ref': distKey,
-              'distance_m': distances[distKey]
+              'distance_m': Math.floor(distances[distKey])
             })
             .transacting(trx)
         })

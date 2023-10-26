@@ -16,10 +16,17 @@
     carNo: null,
     entry: null,
     charge: null,
-    legs: null,
-    checkins: null,
+    legs: [],
+    checkins: [],
     locked: false,
     checkpoints: null
+  })
+
+  const alerts = reactive({
+    visible:false,
+    type:null,
+    title: null,
+    text: null
   })
 
   //##################
@@ -66,27 +73,36 @@
               .then(rows => state.checkpoints = rows.data)
         ])
     })
-    .catch(err=> console.log(err.message))
+    .catch(err => {alert('error', 'Error', err)})
   }
 
   //##################
   //ACTIONS
   //##################
+  function alert(type, title, text) {
+    alerts.type = type
+      alerts.title = title
+      alerts.text = text
+      alerts.visible = true
+      setTimeout(()=>{alerts.visible = false},3000)    
+  }
   function updateStartingCheckpointId() {
     var oEntry = {entry: {starting_checkpoint_id: state.entry.starting_checkpoint_id}}
     axiosPlain.put('/entry/' + state.entry.entry_id, oEntry)
-      .then(rows => state.checkpoints = rows.data)
+    .then(() => {alert('success', '', 'Entry updated')})
+    .catch(err => {alert('error', 'Error', err)})
   }
-
+  function updateCompletePerCard() {
+    var oEntry = {entry: {complete_per_card: state.entry.complete_per_card}}
+    axiosPlain.put('/entry/' + state.entry.entry_id, oEntry)
+    .then(() => {alert('success', '', 'Entry updated')})
+    .catch(err => {alert('error', 'Error', err)})
+  }
   function clearResult() {
     state.locked=true
     return axiosPlain.put('/entry/' + state.entry.entry_id + '/clear_result')
-      .then(() => {
-        router.go(0)
-      })
-      .catch(err =>{
-        console.log(err)
-      })
+      .then(() => { router.go(0) })
+      .catch(err =>{ console.log(err) })
   }
 
   //##################
@@ -181,11 +197,33 @@
 
 <template>
   <v-container fluid>
+    <v-alert
+      :type="alerts.type"
+      :title="alerts.title"
+      :text="alerts.text"
+      v-if="alerts.visible"
+    ></v-alert>    
     <v-row>
       <v-col cols="12">
         <v-sheet v-if="state.entry" color="" class="d-flex border rounded px-3 py-3">
-          <v-chip variant="elevated" class="mr-3 mt-1 text-h5" color="primary">{{ state.entry.car_no }}</v-chip> <span class="text-h4">{{ state.entry.entry_name }}</span><v-spacer/>            
-            <v-chip variant="elevated" :color="colorerGps(resultState)">{{ resultState }}</v-chip>
+          <v-chip variant="elevated" class="mr-3 mt-1 text-h5" color="primary">{{ state.entry.car_no }}</v-chip> <span class="text-h4">{{ state.entry.entry_name }}</span>
+          {{ state.entry.entry_id }}
+          <v-spacer/>
+            <v-chip class="mr-3 mt-2" variant="elevated" :color="colorerGps(resultState)">{{ resultState }}</v-chip>
+            <v-menu>
+            <template v-slot:activator="{ props }">
+              <v-btn class="mt-2" density="compact" icon="mdi-dots-vertical" v-bind="props"></v-btn>
+            </template>
+
+            <v-list>
+              <v-list-item
+                v-for="(item, i) in items"
+                :key="i"
+              >
+                <v-list-item-title>{{ item.title }}</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
         </v-sheet>
         <v-skeleton-loader type="heading" v-else />
       </v-col>
@@ -193,31 +231,35 @@
     <v-row>
       <v-col cols="12" sm="6" md="4">
         <v-sheet v-if="state.entry" color="yellow-lighten-4" class="border rounded px-3 py-3">
-          <div class="font-weight-bold">Entry Record Card</div>
+          <div class="my-3 font-weight-bold">Entry Record Card</div>
             <v-select
               label="Starting Checkpoint"
               density="compact"
               v-model="state.entry.starting_checkpoint_id"
               item-title="sponsor_name"
               item-value="checkpoint_id"
+              v-if="state.checkpoints"
               :items="state.checkpoints"
               @update:modelValue="updateStartingCheckpointId"
             ></v-select> 
-            <v-container fluid>
               <v-radio-group
-                v-model="inline"
+                v-model="state.entry.complete_per_card"
                 inline
+                density="compact"
+                @update:modelValue="updateCompletePerCard"
               >
+                <template v-slot:label>
+                  <div>Course complete?</div>
+                </template>
                 <v-radio
-                  label="Option 1"
-                  value="radio-1"
+                  label="Complete"
+                  value="true"
                 ></v-radio>
                 <v-radio
-                  label="Option 2"
-                  value="radio-2"
+                  label="DNF"
+                  value="false"
                 ></v-radio>
               </v-radio-group>
-            </v-container>
         </v-sheet>
       </v-col>
     </v-row>

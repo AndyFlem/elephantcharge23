@@ -26,31 +26,18 @@
     }, { immediate: true }
   )
 
-  function getState(en) {
-    console.log(en)
-    if (en.no_gps) {
-      return 'No GPS'
-    }
-    if (!en.checkins_calculated || !en.checkins_consistent) {
-      return 'Not Processed'
-    }
-    if (en.completed) {
-      return 'Complete'
-    }
-    return 'DNF ' + (en.checkpoint_count-1) + ' of ' + state.charge.checkpoint_count
-  }
-
   const entries = computed(() => {
     return state.entries.map(e => {
       return {
         car_no: e.car_no,
-        entry_name: e.entry_name,
+        entry_name: {entry_name: e.entry_name, car_no: e.car_no},
         class: e.class,
         raised_dollars: e.raised_dollars,
         no_gps: e.no_gps,
         dist_real: e.no_gps ? 0 : e.dist_real/1000,
         dist_competition: e.no_gps ? 0 : e.dist_competition/1000,
-        result_state: getState(e)
+        processing_status: {processing_status: e.processing_status, result_status: e.result_status},
+        result_status: {processing_status: e.processing_status, result_status: e.result_status}
       }
     })
   })
@@ -61,8 +48,66 @@
   const formatDistance = (value) => {
     return value > 0 ? format(',.3r')(value) : ' - '
   }
-  const colorerGps = (value) => {
-    return value == 'Not Processed' ? 'grey' :(value == 'No GPS' ? 'red' : (value == 'Complete' ? 'green' : 'orange'))
+  const colorProcessingStatus = (value) => {
+    if (value.processing_status == 'LEGS'){
+      return 'green'
+    } else {
+      if (value.processing_status == 'NOT_PROCESSED') {
+        return 'grey'
+      } else {
+        return 'orange'
+      }
+    }    
+  }
+  const formatProcessingStatus = (value) => {
+    if (value.processing_status == 'LEGS'){
+      return 'Processed'
+    } else {
+      if (value.processing_status == 'NOT_PROCESSED') {
+        return 'No GPS'
+      } else {
+        return 'Processing'
+      }
+    }
+  }
+  const processingStatusSortInt = (value) => {
+    if (value.processing_status == 'LEGS'){
+      return 1
+    } else {
+      if (value.processing_status == 'NOT_PROCESSED') {
+        return 3
+      } else {
+        return 2
+      }
+    }
+  }
+
+  const colorResultStatus = (value) => {
+    if (value.result_status == 'COMPLETE') {
+      return 'green'
+    } else {
+      if (value.result_status) {
+        return 'orange'
+      } else {
+        return 'grey'
+      }
+    }
+  }
+  const formatResultStatus = (value) => {
+    if (value.result_status) {
+      if (value.result_status == 'COMPLETE') {
+        return 'Complete'
+      } else {
+        return value.result_status + ' of ' + state.charge.checkpoint_count
+      }
+    } else {
+      return 'No Result'
+    }
+  }
+  const resultStatusSortInt = (value) => {
+    if (value.result_status) {
+      if (value.result_status == 'COMPLETE') { return 1 } else { return 2 }
+    } else { return 3 }
   }
 
   const entryTableHeaders = [
@@ -72,7 +117,8 @@
     {title: 'Pledge $', align: 'end', sortable: true, key: 'raised_dollars', formatter: formatCurrency},
     {title: 'Actual km', align: 'end', sortable: true, key: 'dist_real', formatter: formatDistance},
     {title: 'Competition km', align: 'end', sortable: true, key: 'dist_competition', formatter: formatDistance},
-    {title: 'Result', align: 'middle', sortable: true, key: 'result_state', colorer: colorerGps}
+    {title: 'Status', align: 'middle', sortable: true, key: 'processing_status'},
+    {title: 'Result', align: 'middle', sortable: true, key: 'result_status'}
   ]
 </script>
 
@@ -83,13 +129,16 @@
         <v-card v-if="state.charge" class="mx-auto">
           <v-card-title>{{ state.charge.charge_name }}</v-card-title>
           <v-data-table
-
-          :headers="entryTableHeaders"
+            :headers="entryTableHeaders"
             :items="entries"
             item-value="name"
             items-per-page="-1"
             class="elevation-1"
             density="compact"
+            :custom-key-sort="{
+              'result_status': (a,b) => resultStatusSortInt(a)-resultStatusSortInt(b),
+              'processing_status': (a,b) => processingStatusSortInt(a)-processingStatusSortInt(b)
+              }"
           >
           <template 
             v-for="heder in entryTableHeaders.filter((h) => (h.hasOwnProperty('formatter') || h.hasOwnProperty('colorer')))" 
@@ -100,9 +149,21 @@
             </v-chip>
             <template v-else>
               {{ heder.hasOwnProperty('formatter') ? heder.formatter(value) : value}}
-            </template>
+            </template>         
           </template>
-
+          <template v-slot:[`item.entry_name`]="{ value }">
+            <router-link :to="{name: 'Entry', params: {charge_ref: state.charge.charge_ref, car_no: value.car_no }}">{{ value.entry_name }}</router-link>
+          </template> 
+          <template v-slot:[`item.processing_status`]="{ value }">
+            <v-chip :color="colorProcessingStatus(value)">
+              {{ formatProcessingStatus(value) }}
+            </v-chip>            
+          </template>   
+          <template v-slot:[`item.result_status`]="{ value }">
+            <v-chip :color="colorResultStatus(value)">
+              {{ formatResultStatus(value) }}
+            </v-chip>            
+          </template>   
           <template #bottom></template>
           </v-data-table>
         </v-card>
