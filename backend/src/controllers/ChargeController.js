@@ -12,6 +12,7 @@ module.exports = {
   // READ
   // =======================
   index (req, res) {
+    console.log('index@!!!!!!!!!!!!!!!!')
     Common.debug(req, 'index')
 
     Knex('v_charge')

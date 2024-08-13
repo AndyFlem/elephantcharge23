@@ -26,15 +26,15 @@ const routes = [
       },{
         path: '/teams',
         name: 'Teams',
-        component: () => import(/* webpackChunkName: "charges" */ '@/views/TheTeams.vue'),
+        component: () => import(/* webpackChunkName: "charges" */ '@/views/TeamsList.vue'),
       }, {
         path: '/cars',
         name: 'Cars',
-        component: () => import(/* webpackChunkName: "charges" */ '@/views/TheCars.vue'),
+        component: () => import(/* webpackChunkName: "charges" */ '@/views/CarsList.vue'),
       }, {
         path: '/sponsors',
         name: 'Sponsors',
-        component: () => import(/* webpackChunkName: "charges" */ '@/views/TheSponsors.vue'),
+        component: () => import(/* webpackChunkName: "charges" */ '@/views/SponsorsList.vue'),
       },  
     ],
   },

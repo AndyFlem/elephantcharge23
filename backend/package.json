@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon src/app.js",
+    "start": "DEBUG=ec23:* nodemon src/app.js",
     "lint": "eslint **/*.js"
   },
   "author": "",

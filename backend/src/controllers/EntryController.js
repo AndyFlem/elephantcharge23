@@ -1,9 +1,7 @@
 const Knex = require('../services/db')
 const Luxon = require('luxon')
 const DateTime = Luxon.DateTime
-
 const Common = require('./CommonDebug')('Entry')
-
 const ChargeCommon = require('./ChargeCommon')
 
 //NOT_PROCESSED

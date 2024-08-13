@@ -1,5 +1,6 @@
 const config = require('./config/config')
 const debug = require('debug')('ec23:app')
+
 process.env.NODE_ENV = config.development_mode ? 'development' : 'production'
 
 const express = require('express')
@@ -9,6 +10,7 @@ const http = require('http').Server(app)
 const bodyParser = require('body-parser')
 const cors = require('cors')
 const path = require('path')
+const { copyFileSync } = require('fs')
 
 const corsOptions = {
   //origin: config.cors_origin,

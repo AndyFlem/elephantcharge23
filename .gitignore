@@ -5,7 +5,7 @@
 #   git config --global core.excludesfile '~/.gitignore_global'
 
 
-/frontend/public/config.json
+#/frontend/public/config.json
 
 /frontend/.DS_Store
 /frontend/node_modules/
@@ -26,7 +26,7 @@
 /backend/data_dir/
 
 /backend/data_dir
-/backend/src/config/config.js
+#/backend/src/config/config.js
 /backend/yarn.lock
 
 # Ignore bundler config.
