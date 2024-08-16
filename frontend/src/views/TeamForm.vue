@@ -33,8 +33,12 @@
         axiosPlain.post('/team', state.team)
           .then(ret => {
             state.team.team_id = ret.data.team_id
-            state.team.charge_count=0
-            state.team.checkpoint_count=0
+            state.team.entry_count=0
+            state.team.completed_count=0
+            state.team.completed_count=0
+            state.team.raised_dollars=0
+            state.team.dollars_per_entry=0
+            
             emit('teamCreated', state.team)
             hide()
           })

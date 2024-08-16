@@ -4,6 +4,8 @@
   import { parseISO } from 'date-fns'
   import { format } from 'd3'
   import { DateTime } from 'luxon'
+  import ChargeForm from './ChargeForm.vue'
+import router from '@/router'
 
   const axiosPlain = inject('axiosPlain')
 
@@ -70,6 +72,9 @@
     {title: 'Raised per Entry', align: 'start', sortable: true, key: 'dollars_per_entry', formatter: formatCurrency },
   ]  
 
+  function chargeCreated(charge) {
+    router.push({name: 'Charge', params: {charge_ref: charge.charge_ref}})
+  }
 </script>
 
 <template>
@@ -108,6 +113,14 @@
           </template>          
           <template #bottom></template>
           </v-data-table>
+          <v-card-actions class="d-flex">
+            <v-spacer/>
+            <ChargeForm @charge-created="chargeCreated">
+              <template #activator="{ activate }">
+                <v-btn color="primary" @click="activate">Add Charge</v-btn>
+              </template>
+            </ChargeForm>          
+          </v-card-actions>          
         </v-card>        
       </v-col>
     </v-row>

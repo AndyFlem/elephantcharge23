@@ -14,6 +14,8 @@ module.exports = (app) => {
   app.get(prefix + '/charge/:charge_ref', ChargeController.show)
   app.get(prefix + '/charge/:charge_ref/update_distances', ChargeController.updateDistances)
   app.get(prefix + '/charge/:charge_ref/checkpoints', ChargeController.checkpoints)
+  app.post(prefix + '/charge', ChargeController.create)
+  app.delete(prefix + '/charge/:charge_ref', ChargeController.delete) 
 
   app.get(prefix + '/charge/:charge_ref/entries', EntryController.index)
   app.get(prefix + '/charge/:charge_ref/entry/:car_no', EntryController.show)

@@ -14,11 +14,11 @@ const routes = [
       }, {
         path: '/charges',
         name: 'Charges',
-        component: () => import(/* webpackChunkName: "charges" */ '@/views/TheCharges.vue'),
+        component: () => import(/* webpackChunkName: "charges" */ '@/views/ChargesList.vue'),
       }, {
         path: '/charge/:charge_ref',
         name: 'Charge',
-        component: () => import(/* webpackChunkName: "charge" */ '@/views/TheCharge.vue'),
+        component: () => import(/* webpackChunkName: "charge" */ '@/views/ChargeDetails.vue'),
       }, {
         path: '/charge/:charge_ref/entry/:car_no',
         name: 'Entry',

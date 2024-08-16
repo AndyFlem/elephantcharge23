@@ -55,7 +55,7 @@
   const teamTableHeaders = [
     {title: 'Team', align: 'start', sortable: true, key: 'team_name'},
     {title: 'Captain', align: 'start', sortable: true, key: 'captain'},
-    {title: 'Website', align: 'start', sortable: true, key: 'website'},
+    {title: 'Website', align: 'start', maxWidth:'250', sortable: true, key: 'website'},
     {title: 'Email', align: 'start', sortable: true, key: 'email'},
     {title: 'Charges', align: 'start', sortable: true, key: 'entry_count'},
     {title: 'Completed', align: 'start', sortable: true, key: 'completed_count'},

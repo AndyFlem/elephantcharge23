@@ -3,7 +3,9 @@
   import { useRoute, useRouter } from 'vue-router'
   import { format } from 'd3'
   import { DateTime } from 'luxon'
-  
+  import "leaflet/dist/leaflet.css"
+  import { LMap, LTileLayer } from "@vue-leaflet/vue-leaflet"
+
   const axiosPlain = inject('axiosPlain')
   const route = useRoute()
   const router = useRouter()
@@ -261,6 +263,17 @@
                 ></v-radio>
               </v-radio-group>
         </v-sheet>
+      </v-col>
+      <v-col cols="12" sm="6" md="4">
+        <div style="height:400px; width:400px">
+          <l-map ref="map" :zoom="10" :use-global-leaflet="false" :center="[47.41322, -1.219482]">
+            <l-tile-layer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              layer-type="base"
+              name="OpenStreetMap"
+            ></l-tile-layer>
+          </l-map>
+        </div>        
       </v-col>
     </v-row>
     <v-row v-if="state.entry">

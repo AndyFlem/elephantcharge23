@@ -338,7 +338,12 @@ module.exports = {
           .where({entry_id: entryId})
           .transacting(trx)
       })
-    
+      .then(() => {
+        return Knex('entry')
+          .update({processing_status: 'CLEAN'})
+          .where({entry_id: entryId})
+          .transacting(trx)  
+      })        
   }, 
   doDeleteLegs(req, trx, entryId) {
     Common.debug(req, 'doDeleteLegs')
@@ -353,6 +358,12 @@ module.exports = {
           .delete()
           .transacting(trx)  
       })
+      .then(() => {
+        return Knex('entry')
+          .update({processing_status: 'CHECKINS'})
+          .where({entry_id: entryId})
+          .transacting(trx)
+      })      
   }, 
   calculateCheckins(req,res) {
     Common.debug(req, 'calculateCheckins')
@@ -468,5 +479,11 @@ module.exports = {
           .where({entry_id: entryId})
           .transacting(trx)
       })
+      .then(() => {
+        return Knex('entry')
+          .update({processing_status: 'CHECKINS'})
+          .where({entry_id: entryId})
+          .transacting(trx)  
+      })      
   }
 }
