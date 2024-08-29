@@ -3,12 +3,31 @@ const Luxon = require('luxon')
 const DateTime = Luxon.DateTime
 const Common = require('./CommonDebug')('Entry')
 const ChargeCommon = require('./ChargeCommon')
+const GeotabController = require('./GeotabController')
+const GPSCommon = require('./GPSCommon')
 
-//NOT_PROCESSED
-//RAW
+//NO_GPS
 //CLEAN
 //CHECKINS
 //LEGS
+
+function extractGPX(gpxString) {
+  Common.debug(null, 'extractGPX')
+  const xpath = require('xpath')
+  const dom = require('@xmldom/xmldom').DOMParser
+
+  const doc = new dom().parseFromString(gpxString, 'text/xml')
+
+  //const select = xpath.useNamespaces({"kml": "http://www.opengis.net/kml/2.2"})
+  const nodes = xpath.select(`//*[local-name()='trkpt']`, doc)
+  
+  return nodes.map(node => {
+    const datetime = DateTime.fromISO(xpath.select(`string(*[local-name()='time'])`, node))
+    const lat = xpath.select('string(@lat)', node)
+    const lon = xpath.select('string(@lon)', node)
+    return {lat: lat, lon: lon, datetime: datetime}
+  })
+}
 
 module.exports = {
   // =======================
@@ -19,7 +38,7 @@ module.exports = {
     Common.debug(req, 'index')
 
     Knex('v_entry')
-      .where({charge_ref: req.params.charge_ref})
+      .where({charge_id: req.params.charge_id})
       .select()
       .then(entries => res.send(entries))
       .catch(err => {
@@ -29,27 +48,6 @@ module.exports = {
   },
   show (req, res) {
     Common.debug(req, 'show')
-
-    let entry
-
-    Knex.transaction(function (trx) {
-      return module.exports.getEntryByCar(req, trx, req.params.charge_ref, req.params.car_no)  
-        .then(ent => {
-          entry = ent
-        })
-        .then(trx.commit)
-        .catch(trx.rollback)
-    })
-    .then(() => {
-      res.send(entry)
-    })
-    .catch(err => {
-      Common.error(req, 'show', err)
-      res.status(500).send({ error: 'An error has occured trying fetch the entry: ' + err })
-    })
-  },
-  showById (req, res) {
-    Common.debug(req, 'showById')
 
     let entry
 
@@ -65,10 +63,24 @@ module.exports = {
       res.send(entry)
     })
     .catch(err => {
-      Common.error(req, 'showById', err)
+      Common.error(req, 'show', err)
       res.status(500).send({ error: 'An error has occured trying fetch the entry: ' + err })
     })
-  }, 
+  },
+  showGeometry (req, res) {
+    Common.debug(req, 'showGeometry')
+
+    Knex('entry_geometry')
+      .where({entry_id: req.params.entry_id})
+      .select(['entry_id', 'raw_line_json', 'clean_line_json', 'raws_count', 'cleans_count'])
+    .then(entry => {
+      res.send(entry)
+    })
+    .catch(err => {
+      Common.error(req, 'showGeometry', err)
+      res.status(500).send({ error: 'An error has occured trying fetch the entry: ' + err })
+    })
+  },   
   entriesForCharge (req, trx, chargeId) {
     Common.debug(req, 'entriesForCharge', 'ChargeId: ' + chargeId )
 
@@ -77,7 +89,28 @@ module.exports = {
       .select()
       .transacting(trx)
   },
+  indexClasses (req, res) {
+    Common.debug(req, 'indexClasses')
 
+    Knex('class')
+      .select()
+      .then(classes => res.send(classes))
+      .catch(err => {
+        Common.error(req, 'indexClasses', err)
+        res.status(500).send({ error: 'an error has occured getting the classes: ' + err })
+      })
+  },
+  indexCategories (req, res) {
+    Common.debug(req, 'indexCategories')
+
+    Knex('category')
+      .select()
+      .then(categories => res.send(categories))
+      .catch(err => {
+        Common.error(req, 'indexCategories', err)
+        res.status(500).send({ error: 'an error has occured getting the categories: ' + err })
+      })
+  },
   legs(req, res) {
     Common.debug(req, 'legs')
 
@@ -135,7 +168,7 @@ module.exports = {
     })
   },
   doGetCheckins (req, trx, entryId) {
-    Common.debug(req, 'doGetCheckins')
+    Common.debug(null, 'doGetCheckins')
 
     return Knex('v_checkin')
       .where({entry_id: entryId})
@@ -144,15 +177,17 @@ module.exports = {
       .select()
   },
   getEntry(req, trx, entryId) {
-    Common.debug(req, 'getEntry')
+    Common.debug(null, 'getEntry')
     
     return Knex('v_entry')
       .where({entry_id: entryId})
       .select()
       .transacting(trx)
       .then(entries => {
+        Common.debug(null, 'getEntry', entries[0].entry_id)
         return entries[0]
       })
+
   },
   getEntryByCar(req, trx, chargeRef, carNo) {
     Common.debug(req, 'getEntryByCar')
@@ -167,12 +202,114 @@ module.exports = {
   // =======================
   // WRITE
   // =======================
+  create (req, res) {
+    Common.debug(req, 'create')
+
+    const oInsert = {charge_id: req.body.charge_id, class_id: req.body.class_id, car_id: req.body.car_id, team_id: req.body.team_id, entry_name: req.body.entry_name, car_no: req.body.car_no, processing_status:'NO_GPS', captain: req.body.captain, members: req.body.members, raised_local: req.body.raised_local}
+    let entryId
+
+    if (!req.body.category_ids) { req.body.category_ids=[] }
+
+    Knex.transaction(function (trx) {
+      return Knex('entry')
+        .insert(oInsert)      
+        .returning('entry_id')
+        .transacting(trx)
+        .then(entryIds => {
+          entryId = entryIds[0].entry_id
+        })
+        .then(() => {
+          return Promise.all(req.body.category_ids.map(cat => {
+            return Knex('entry_category')
+              .insert({entry_id: entryId, category_id: cat})
+              .transacting(trx)
+          }))
+        })
+        .then(() => {
+          return Knex('entry_geometry')
+            .insert({entry_id: entryId})
+            .transacting(trx)
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+      })
+      .then(() => {
+        res.send({ entry_id: entryId })
+      })
+      .catch(err => {
+        Common.error(req, 'create', err)
+        res.status(500).send({ error: 'an error has occured creating the entry: ' + err })
+      })
+  },
   update (req, res) {
     Common.debug(req, 'update')
 
+    const oUpdate = {class_id: req.body.class_id, car_id: req.body.car_id, team_id: req.body.team_id, entry_name: req.body.entry_name, car_no: req.body.car_no, captain: req.body.captain, members: req.body.members, raised_local: req.body.raised_local}
+
     Knex.transaction(function (trx) {
-      Knex('entry')
-        .update(req.body.entry)
+      return Knex('entry')
+        .update(oUpdate)
+        .where({entry_id: req.params.entry_id})
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(()=>{
+      return Knex('entry_category')
+        .where({entry_id: req.params.entry_id})
+        .delete()
+    })
+    .then(() => {
+      return Promise.all(req.body.category_ids.map(cat => {
+        return Knex('entry_category')
+          .insert({entry_id: req.params.entry_id, category_id: cat})
+       }))
+    })    
+    .then(() => {
+      res.send({'update': 'ok'})
+    })
+    .catch(err => {
+      Common.error(req, 'update', err)
+      res.status(500).send({ error: 'An error has occured trying update the entry: ' + err })
+    })    
+  },
+  delete (req, res) {
+    Common.debug(req, 'delete')
+
+    Knex.transaction(function (trx) {
+      return Knex('entry_geometry')  
+        .where('entry_id', req.params.entry_id)
+        .transacting(trx)
+        .delete()
+        .then(() => {
+          return Knex('entry_category')
+            .where('entry_id', req.params.entry_id)
+            .transacting(trx)
+            .delete()
+        })
+        .then(() =>{
+          return Knex('entry')
+            .where('entry_id', req.params.entry_id)
+            .transacting(trx)
+            .delete()
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+      .then(() => res.send({ message: 'ok' }))
+      .catch(err => {
+        Common.error(req, 'delete', err)
+        res.status(500).send({ error: 'an error has occured deleting the entry: ' + err })
+      })
+  },
+
+  updateCheckpointCard (req, res) {
+    Common.debug(req, 'updateCheckpointCard')
+
+    const oUpdate = {starting_checkpoint_id: req.body.starting_checkpoint_id, complete_per_card: req.body.complete_per_card}
+
+    Knex.transaction(function (trx) {
+      return Knex('entry')
+        .update(oUpdate)
         .where({entry_id: req.params.entry_id})
         .then(trx.commit)
         .catch(trx.rollback)
@@ -181,10 +318,215 @@ module.exports = {
       res.send({'update': 'ok'})
     })
     .catch(err => {
-      Common.error(req, 'update', err)
-      res.status(500).send({ error: 'An error has occured trying update the  entry: ' + err })
+      Common.error(req, 'updateCheckpointCard', err)
+      res.status(500).send({ error: 'An error has occured trying update the entry: ' + err })
+    })
+  },
+
+  importGeotab (req, res) {
+    Common.debug(req, 'importGeotab')
+
+    const entry_id = req.params.entry_id
+    const device_id = req.body.device_id
+    const date = req.body.date
+    let importCounts
+
+    Knex.transaction(function (trx) {
+      return module.exports.doClearResult(req, trx, entry_id)
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(() => {
+      return GeotabController.importRaw(req, entry_id, device_id, date, req.query.offset24hr)
+    })
+    .then(cnts => {
+      importCounts = cnts
+      if (importCounts.clean_count > 0) {
+        return Knex.transaction(function (trx) {
+          module.exports.doCalculateCheckins(req, trx, entry_id)
+            .then(trx.commit)
+            .catch(trx.rollback)
+        })
+      }
+    })
+    .then(() => {
+      Common.debug(null, 'importGeotab', JSON.stringify(importCounts))
+      res.send(importCounts)
+    })
+    .catch(err => {
+      Common.error(req, 'importGeotab', err)
+      res.status(500).send({ error: 'an error has occured importing the geotab raw gps data: ' + err })
+    })
+  },
+  importGpx (req, res) {
+    Common.debug(req, 'importGpx')
+
+    const entry_id = req.params.entry_id
+
+    let counts
+    let entry
+    let charge
+    let unfiltered 
+
+    if (!req.files) {
+      return res.status(400).send("No files were uploaded.");
+    }
+    
+    return Knex.transaction(function (trx) {
+      module.exports.getEntry(req, trx, entry_id)
+        .then(ent => {
+          entry = ent
+          return ChargeCommon.getChargeById(req, trx, entry.charge_id)
+        })
+        .then(chrg => {
+          charge = chrg
+          return module.exports.doClearResult(req, trx, entry_id)
+        })
+        .then(() => {
+          let gpx = req.files.file.data.toString('utf8')
+          unfiltered = extractGPX(gpx)
+          let rows = unfiltered.filter(v=>v.datetime.diff(DateTime.fromISO(charge.charge_date),'days').days<1)
+          return GPSCommon.importRaw(req, trx, entry_id, rows, 0)
+        })
+        .then(cnts => {
+          counts = cnts
+
+          return Knex('entry')
+            .update({
+              processing_status: counts.clean_count > 0 ? 'CLEAN':'NO_GPS', 
+              gps_source_ref: counts.clean_count > 0 ? 'GPX' : null,
+              geotab_device_id: null
+            })
+            .where({entry_id: entry_id})
+            .transacting(trx)    
+        })
+        .then(() => {
+          if (counts.clean_count > 0 ) {
+            return module.exports.doCalculateCheckins(req, trx, entry_id)
+          }
+        })  
+        .then(trx.commit)
+        .catch(trx.rollback)
+      })
+      .then(() => {
+        Common.debug(null, 'importGpx', JSON.stringify(counts))
+        res.send(counts)
+      })
+      .catch(err => {
+        Common.error(req, 'importGpx', err)
+        res.status(500).send({ error: 'an error has occured importing the raw gps data: ' + err })
+      })
+
+  },
+
+  clearResult(req, res) {
+    Common.debug(req, 'clearResult')
+
+    Knex.transaction(function (trx) {
+      return module.exports.doClearResult(req, trx, req.params.entry_id)
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(() => {
+      res.send({result: 'ok'})
+    })
+    .catch(err => {
+      Common.error(req, 'clearResult', err)
+      res.status(500).send({ error: 'An error has occured trying to clear the result for the entry: ' + err })
     })    
   },
+  doClearResult(req, trx, entryId) {
+    Common.debug(null, 'doClearResult')
+
+    return module.exports.doDeleteDistances(req, trx, entryId)
+      .then(() => {
+        return module.exports.doDeleteLegs(req, trx, entryId)
+      })
+      .then(() => {
+        return module.exports.doDeleteCheckins(req, trx, entryId)
+      })
+      .then(()=>{
+        return Knex('gps_clean')
+          .where({entry_id: entryId})
+          .delete()
+          .transacting(trx)
+      })
+      .then(()=>{
+        return Knex('gps_stop')
+          .where({entry_id: entryId})
+          .delete()
+          .transacting(trx)  
+      })
+      .then(()=>{
+        return Knex('gps_raw')
+          .where({entry_id: entryId})
+          .delete()
+          .transacting(trx)  
+      })       
+      .then(()=>{
+        return Knex('entry_geometry')
+          .where({entry_id: entryId})
+          .update({raw_line: null, clean_line: null, raw_line_kml: null, clean_line_kml: null, raw_line_json: null, clean_line_json: null, raws_count: null, cleans_count: null, stops_count: null, raws_from: null, raws_to: null})
+          .transacting(trx)
+      })
+      .then(() => {
+        return Knex('entry')
+          .update({
+            processing_status: 'NO_GPS', 
+            gps_source_ref: null,
+            geotab_device_id: null,
+            result_status: null
+          })
+          .where({entry_id: entryId})
+          .transacting(trx)
+        })
+        .then(()=>{
+          Common.debug(null, 'doClearResult', 'Result Cleared')
+        })
+        .catch(err => {
+          Common.debug(null, 'doClearResult ERROR: ', err)
+          throw err
+        })
+  },
+  doDeleteDistances(req, trx, entryId) {
+    Common.debug(req, 'doDeleteDistances')
+
+    return Knex('entry_distance')
+      .where({entry_id: entryId})
+      .delete()
+      .transacting(trx)
+
+  },
+  doDeleteCheckins(req, trx, entryId) {
+    Common.debug(null, 'doDeleteCheckins')
+
+    return Knex('checkin')
+      .where({entry_id: entryId})
+      .delete()
+      .transacting(trx)
+      .then(()=>{
+        return Knex('entry')
+          .update({checkins_consistent: false, checkins_inconsistent_message: ''})
+          .where({entry_id: entryId})
+          .transacting(trx)
+      })
+      
+  }, 
+  doDeleteLegs(req, trx, entryId) {
+    Common.debug(req, 'doDeleteLegs')
+
+    return Knex('gps_clean')
+      .update({entry_leg_id: null})
+      .where({entry_id: entryId})
+      .transacting(trx)
+      .then(() => {
+        return Knex('entry_leg')
+          .where({entry_id: entryId})
+          .delete()
+          .transacting(trx)  
+      })   
+  }, 
+
   updateDistances (req, res) {
     Common.debug(req, 'updateDistances')
 
@@ -195,7 +537,7 @@ module.exports = {
       return module.exports.getEntryByCar(req, trx, req.params.charge_ref, req.params.car_no)
         .then(ent => {
           entry = ent
-          return module.exports.doUpdateDistances (req, trx, entry.entry_id)
+          return module.exports.doUpdateDistances(req, trx, entry.entry_id)
         })
         .then(dists => {
           distances = dists
@@ -212,7 +554,7 @@ module.exports = {
     })      
   },
   doUpdateDistances (req, trx, entryId) {
-    Common.debug(req, 'doUpdateDistances')
+    Common.debug(null, 'doUpdateDistances', entryId)
 
     let entry 
     let charge
@@ -229,23 +571,27 @@ module.exports = {
       'TOTAL_COMPETITION': 0,
       'NET': null
     }
-
+    Common.debug(null, 'doUpdateDistances', 'Delete existing distances')
     return Knex('entry_distance')
       .where({entry_id: entryId})
       .delete()
       .transacting(trx)
       .then(() =>{
+        Common.debug(null, 'doUpdateDistances', 'Getting entry')
         return module.exports.getEntry(req, trx, entryId)
       })
       .then(ent => {
         entry = ent
+        Common.debug(null, 'doUpdateDistances', 'Getting charge')
         return ChargeCommon.getChargeById(req, trx, entry.charge_id)
       })
       .then(chg => {
         charge = chg
+        Common.debug(null, 'doUpdateDistances', 'Getting legs')
         return module.exports.doGetLegs(req, trx, entryId)
       })
       .then(legs => {
+        Common.debug(null, 'doUpdateDistances', 'Got legs:' + legs.length)
         for (const leg of legs) {
           distances.TOTAL += leg.distance_m
           if (leg.is_gauntlet) {
@@ -280,102 +626,26 @@ module.exports = {
             })
             .transacting(trx)
         })
+        Common.debug(null, 'doUpdateDistances', 'Updating distances')
         return Promise.all(distInserts)
       })
       .then(() => {
         return distances
       })
-  },
-  clearResult(req, res) {
-    Common.debug(req, 'clearResult')
-
-    Knex.transaction(function (trx) {
-      return module.exports.doClearResult(req, trx, req.params.entry_id)
-        .then(trx.commit)
-        .catch(trx.rollback)
-    })
-    .then(() => {
-      res.send({result: 'ok'})
-    })
-    .catch(err => {
-      Common.error(req, 'clearResult', err)
-      res.status(500).send({ error: 'An error has occured trying to clear the result for the entry: ' + err })
-    })    
-  },
-  doClearResult(req, trx, entryId) {
-    Common.debug(req, 'doClearResult')
-
-    return module.exports.doDeleteDistances(req, trx, entryId)
-      .then(() => {
-        return module.exports.doDeleteLegs(req, trx, entryId)
-      })
-      .then(() => {
-        return module.exports.doDeleteCheckins(req, trx, entryId)
-      })
-      .then(() => {
-        return module.exports.doCalculateCheckins(req, trx, entryId)
+      .catch(err => {
+        Common.debug(null, 'doUpdateDistances ERROR: ', err)
+        throw(err)
       })
   },
-  doDeleteDistances(req, trx, entryId) {
-    Common.debug(req, 'doDeleteDistances')
-
-    return Knex('entry_distance')
-      .where({entry_id: entryId})
-      .delete()
-      .transacting(trx)
-
-  },
-  doDeleteCheckins(req, trx, entryId) {
-    Common.debug(req, 'doDeleteCheckins')
-
-    return Knex('checkin')
-      .where({entry_id: entryId})
-      .delete()
-      .transacting(trx)
-      .then(()=>{
-        return Knex('entry')
-          .update({checkins_calculated: false, checkins_consistent: false})
-          .where({entry_id: entryId})
-          .transacting(trx)
-      })
-      .then(() => {
-        return Knex('entry')
-          .update({processing_status: 'CLEAN'})
-          .where({entry_id: entryId})
-          .transacting(trx)  
-      })        
-  }, 
-  doDeleteLegs(req, trx, entryId) {
-    Common.debug(req, 'doDeleteLegs')
-
-    return Knex('gps_clean')
-      .update({entry_leg_id: null})
-      .where({entry_id: entryId})
-      .transacting(trx)
-      .then(() => {
-        return Knex('entry_leg')
-          .where({entry_id: entryId})
-          .delete()
-          .transacting(trx)  
-      })
-      .then(() => {
-        return Knex('entry')
-          .update({processing_status: 'CHECKINS'})
-          .where({entry_id: entryId})
-          .transacting(trx)
-      })      
-  }, 
   calculateCheckins(req,res) {
     Common.debug(req, 'calculateCheckins')
 
-    var checkins
-    var entry
+    let checkins
 
     Knex.transaction(function (trx) {
-      return module.exports.getEntryByCar(req, trx, req.params.charge_ref, req.params.car_no)
-        .then(ent => {
-          entry = ent
-          return module.exports.doCalculateCheckins(req, trx, entry.entry_id)
+      return module.exports.doDeleteCheckins(req, trx, req.params.entry_id)
+        .then(() => {
+          return module.exports.doCalculateCheckins(req, trx, req.params.entry_id)
         })
         .then(chcks => {
           checkins = chcks
@@ -384,6 +654,7 @@ module.exports = {
         .catch(trx.rollback)
     })
     .then(() => {
+      Common.debug(null, 'calculateCheckins', `Got ${checkins.length} checkins`)
       res.send(checkins)
     })
     .catch(err => {
@@ -393,7 +664,7 @@ module.exports = {
   },
   //Gets the ordered list of checkins (checkpoint stops) for the entry
   doCalculateCheckins(req, trx, entryId) {
-    Common.debug(req, 'doCalculateCheckins')
+    Common.debug(null, 'doCalculateCheckins', entryId)
     let charge
     let entry
     let points
@@ -407,7 +678,6 @@ module.exports = {
     let last_checkpoint_id
     let last_gps_clean_id
 
-    
     return module.exports.getEntry(req,trx,entryId)
       .then(ent=>{
         entry = ent
@@ -423,20 +693,23 @@ module.exports = {
         }
 
         // Get all gps clean points inside a checkpoint radius
-        return Knex.raw(`SELECT * FROM ec_points_within_checkpoint(${entryId}, '${startTime.toISO()}', '${endTime.toISO()}') ORDER BY gps_timestamp`)
+        Common.debug(null, 'doCalculateCheckins','Getting points in checkpoint radius')
+        return Knex.raw(`SELECT * FROM ec23_points_within_checkpoint(${entryId}, '${startTime.toISO()}', '${endTime.toISO()}') ORDER BY gps_timestamp`)
           .transacting(trx)
       })
       .then(pnts => {
         points = pnts.rows
 
         //Iterate cthrough the gps points
+        Common.debug(null, 'doCalculateCheckins','Iterate points')
         points.forEach((point, indx) => {
           //Test to see if the current checkin should be processed:
           //1) Last point in the set
           //2) New checkpoint_id
           //3) Same checkpoint_id but gap of 15 gps points (leave and return)
           if (indx == points.length-1 || last_checkpoint_id != point.checkpoint_id || point.gps_clean_id > (last_gps_clean_id+15)) {
-            if (checkin) {
+            
+            if (checkin) { // Previous checkin
               checkin.points.forEach(v => {
                 if (v.distance_m < checkin.distance_m) {
                   checkin.checkin_number = checkinNumber
@@ -446,6 +719,7 @@ module.exports = {
                 } 
               })
               checkin.points = []
+              
               checkins.push(checkin)
             }
             checkinNumber+=1
@@ -460,6 +734,7 @@ module.exports = {
           last_gps_clean_id = point.gps_clean_id
         })
         //Persist
+        Common.debug(null, 'doCalculateCheckins','Persist')
         return Promise.all(checkins.map(ck => {
           return Knex('checkin')
             .insert({
@@ -474,16 +749,228 @@ module.exports = {
         }))
       })
       .then(() => {
-        return Knex('entry')
-          .update({checkins_calculated: true})
-          .where({entry_id: entryId})
-          .transacting(trx)
+        Common.debug(null, 'doCalculateCheckins','Update entry status')
+        if (checkins.length > 0) {
+          return Knex('entry')
+            .update({processing_status: 'CHECKINS'})
+            .where({entry_id: entryId})
+            .transacting(trx)  
+        }
       })
       .then(() => {
-        return Knex('entry')
-          .update({processing_status: 'CHECKINS'})
-          .where({entry_id: entryId})
-          .transacting(trx)  
-      })      
+        return checkins
+      })
+  },
+
+  processLegs(req, res) {
+    Common.debug(req, 'processLegs')
+
+    module.exports.doProcessLegs(req, req.params.entry_id)
+      .then(result => {
+        res.send({result: result})
+      })
+      .catch(err => {
+        Common.error(req, 'processLegs', err)
+        res.status(500).send({ error: 'An error has occured trying to process the legs for the entry: ' + err })
+      })   
+
+  },
+
+  doProcessLegs(req, entryId) {
+    Common.debug(null, 'doProcessLegs', entryId)
+
+    let entry
+    let charge
+    let checkins
+    let legs = []
+    let msgs = []
+    let checkpoints
+    let checkpointDict = {}
+    let result
+
+    return Knex.transaction(function (trx) {
+      Knex('v_entry')
+        .where({entry_id: entryId})
+        .select()
+        .transacting(trx)
+        .then(entries => {
+          entry = entries[0]
+          return Knex('v_checkpoint')
+            .select()
+            .transacting(trx)
+        })
+        .then(chks => {
+          checkpoints = chks
+          return ChargeCommon.getChargeById(req, trx, entry.charge_id)
+        })
+        .then(chrg => {
+          charge = chrg
+          if (!entry.processing_status == 'CHECKINS') { throw new Error('NO checkins, cant process legs') }
+          if (!entry.starting_checkpoint_id || entry.complete_per_card == null) { throw new Error('No checkpoint card, cant process legs') }
+
+          return module.exports.doDeleteLegs(req, trx, entryId)
+        })
+        .then(() => {
+          return module.exports.doGetCheckins(req, trx, entryId)
+        })
+        .then(chks => {
+          checkins = chks
+          if (checkins[0].checkpoint_id != entry.starting_checkpoint_id) { 
+            msgs.push('Unexpected starting checkpoint: ' + checkins[0].sponsor_name)
+          }
+
+          for (let indx = 0; indx <= checkins.length - 2; indx ++) {
+
+            if (checkpointDict[checkins[indx].checkpoint_id]) {
+              msgs.push('Duplicate checkpoint: ' + checkins[indx].sponsor_name)
+            }
+            checkpointDict[checkins[indx].checkpoint_id] = checkins[indx].sponsor_name
+
+            legs.push({
+              leg_no: indx + 1,
+              checkin1: checkins[indx],
+              checkin2: checkins[indx+1],
+            })
+          }
+          if (legs.length > charge.checkpoint_count) {
+            msgs.push('Too many legs.')
+          }
+          if (legs.length < charge.checkpoint_count && entry.complete_per_card) {
+            msgs.push('Checkpoint card result (complete) and track result (DNF) dont match.')
+          }
+          if (entry.complete_per_card && (legs[legs.length-1].checkin2.checkpoint_id != legs[0].checkin1.checkpoint_id)) {
+            msgs.push(`Starting  and ending checkpoint dont match.`)
+          }          
+
+          return new Promise((resolve, reject) => {  
+            let oEntry = {}
+            if (msgs.length==0) {
+              doAddLegs(req, trx, entry, checkpoints, legs)
+                .then(() => {
+                  return module.exports.doUpdateDistances(req, trx, entryId)
+                })
+                .then(() => {
+                  oEntry.checkins_consistent = true    
+                  oEntry.processing_status = 'LEGS'
+                  oEntry.checkins_inconsistent_message = ''
+                  oEntry.result_status = legs.length == charge.checkpoint_count?'COMPLETE':'DNF ' + legs.length
+                  console.log(oEntry)
+                  resolve(oEntry)
+                })
+                .catch(err => {
+                  reject(err)
+                })
+            } else {
+              oEntry.checkins_inconsistent_message = msgs.join('\n')
+              oEntry.checkins_consistent = false
+              resolve(oEntry)
+            }  
+          })
+        })
+        .then(ent => {
+          result=ent
+          Common.debug(null, 'doProcessLegs', 'Result: ' + JSON.stringify(ent))
+          return Knex('entry')
+            .update(ent)
+            .where({entry_id: entryId})
+            .transacting(trx)         
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)            
+    })
+    .then(() => {
+      return({result: result})
+    })
+    .catch(err => {
+      Common.debug(null, 'doProcessLegs', err)
+      throw(err)     
+    })   
+
   }
+}
+async function doAddLegs(req, trx, entry, checkpoints, entryLegs) {
+  Common.debug(req, 'doAddLegs')
+
+  let legProcs = []
+  let legNo = 1
+  for await (const entryLeg of entryLegs) {
+    legProcs.push(await new Promise( async (resolve1, reject1) => {
+      let checkpoint1 = checkpoints.find(v=>v.checkpoint_id==entryLeg.checkin1.checkpoint_id)
+      let checkpoint2 = checkpoints.find(v=>v.checkpoint_id==entryLeg.checkin2.checkpoint_id) 
+      let oLeg
+      let entryLegId
+
+      return Knex('leg')
+        .where({checkpoint1_id: entryLeg.checkin1.checkpoint_id, checkpoint2_id: entryLeg.checkin2.checkpoint_id})
+        .orWhere({checkpoint1_id: entryLeg.checkin2.checkpoint_id, checkpoint2_id: entryLeg.checkin1.checkpoint_id})
+        .select()
+        .transacting(trx)
+        .then(legs => {
+          return new Promise((resolve, reject) => {
+            if (legs.length>0) {
+              Common.debug(null, 'doAddLegs', 'Found existing leg', legs[0])
+              resolve(legs[0])
+            } else {
+              Common.debug(null, 'doAddLegs', 'Creating new leg')
+              let oInsert = {
+                checkpoint1_id: checkpoint1.checkpoint_id,
+                checkpoint2_id: checkpoint2.checkpoint_id,
+                is_gauntlet: (checkpoint1.is_gauntlet && checkpoint2.is_gauntlet)?true:false
+              }
+              Knex('leg')
+                .insert(oInsert)
+                .returning('leg_id')
+                .transacting(trx)
+                .then(ret=>{
+                  oInsert.leg_id = ret[0].leg_id
+                  return Knex.raw(`SELECT ec23_legdistance(${oInsert.leg_id})`)
+                    .transacting(trx)
+                })
+                .then(()=>{
+                  resolve(oInsert)
+                })
+                .catch(err => {
+                  reject(err)
+                })
+            }
+          })
+        })
+        .then(lg => {
+          oLeg = lg
+          Common.debug(null, 'doAddLegs', 'Adding entry_leg:' + JSON.stringify(oLeg))
+          const elapsed_s = Math.floor((entryLeg.checkin2.checkin_timestamp - entryLeg.checkin1.checkin_timestamp) / 1000)
+          return Knex('entry_leg')
+            .insert({
+              entry_id: entry.entry_id, 
+              leg_id: oLeg.leg_id,
+              leg_no: legNo,
+              elapsed_s: elapsed_s,
+              checkin1_id: entryLeg.checkin1.checkin_id,
+              checkin2_id: entryLeg.checkin2.checkin_id,
+              direction_forward: (entryLeg.checkin1.checkpoint_id == oLeg.checkpoint1_id)
+              })
+            .returning('entry_leg_id')
+            .transacting(trx)
+        })
+        .then(elid =>{
+          entryLegId = elid[0].entry_leg_id
+          Common.debug(null, 'doAddLegs', 'Adding entry_leg_geometry:' + entryLegId)
+          return Knex.raw(`SELECT ec23_entryleg_create_geometry(${entryLegId})`)
+            .transacting(trx)
+        })
+        .then(()=>{
+          resolve1()
+        })
+        .catch(err => {
+          Common.debug(null, 'doAddLegs Error: ', err)
+          reject1(err)
+        })
+    }))
+    legNo+=1
+  }
+
+  for await (const proc of legProcs) {
+    await proc
+  }
+
 }

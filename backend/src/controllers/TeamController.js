@@ -19,6 +19,26 @@ module.exports = {
         res.status(500).send({ error: 'an error has occured getting the teams: ' + err })
       })
   },
+  indexAvailableForCharge(req, res) {
+    Common.debug(req, 'indexAvailableForCharge')
+
+    req.query.include=req.query.include || -1
+
+    Knex.raw(`SELECT * FROM team t
+              WHERE t.team_id NOT IN 
+	            (SELECT DISTINCT tm.team_id FROM team tm INNER JOIN entry e ON tm.team_id=e.team_id WHERE e.charge_id=? AND e.entry_id!=?)`, [req.params.charge_id, req.query.include])
+      .then(cars => {
+        cars=cars.rows.map(c=>{
+          c.car_description=c.car_name + ' - ' + (c.colour?(' ' + c.colour):'') + (c.year?(' ' + c.year):'')  + (c.make?(' ' + c.make):'')  + (c.model?(' ' + c.model):'') + (c.registration?(' ' + c.registration):'') + ', last charge: ' + c.last_charge
+          return c
+        })
+        res.send(cars)
+      })
+      .catch(err => {
+        Common.error(req, 'indexAvailableForCharge', err)
+        res.status(500).send({ error: 'an error has occured getting the teams: ' + err })
+      })
+  },  
   show (req, res) {
     Common.debug(req, 'show')
 

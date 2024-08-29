@@ -5,7 +5,7 @@
   const axiosPlain = inject('axiosPlain')
   const emit = defineEmits(['chargeCreated', 'chargeUpdated'])
   const props = defineProps({
-    chargeRef: String,
+    chargeId: Number,
     dialog: Boolean
   })
 
@@ -13,6 +13,7 @@
   const form = ref()
 
   const blankCharge = {
+    charge_id: null,
     charge_ref: null,
     charge_name: null,
     start_time:"07:00:00+02",
@@ -20,20 +21,27 @@
     m_per_local:0.5,
     gauntlet_multiplier:3,
     exchange_rate:25,
+    map_scale:12,
+    location:'Unknown location'
   }
   const state = reactive({    
     charge: {...blankCharge},
+    charge_date: null
   })
   
   watch(()=>props.dialog, newVal => {
     newVal ? show() : hide()
   })
+  watch(()=>state.charge_date, newVal => {
+    state.charge.charge_date=DateTime.fromJSDate(newVal).toISODate()
+  })
+
   async function submit () {
     const { valid } = await form.value.validate()
 
     if (valid) {
-      if (props.chargeRef) {
-        axiosPlain.put(`/charge/${props.chargeRef}`, state.charge)
+      if (props.chargeId) {
+        axiosPlain.put(`/charge/${props.chargeId}`, state.charge)
           .then(() => {
             emit('chargeUpdated', state.charge)
             hide()
@@ -41,7 +49,8 @@
       } else {
         axiosPlain.post('/charge', state.charge)
           .then(ret => {
-            state.charge.charge_ref = ret.data.charge_ref
+            console.log(ret)
+            state.charge.charge_id = ret.data.charge_id
             emit('chargeCreated', state.charge)
             hide()
           })
@@ -49,18 +58,16 @@
     }
   }
   function show() {
-    console.log('show')
-    if (props.chargeRef) {
-      axiosPlain.get(`/charge/${props.chargeRef}`)
+    if (props.chargeId) {
+      axiosPlain.get(`/charge/${props.chargeId}`)
         .then(row => {
           state.charge = row.data
-          state.charge.charge_date = DateTime.fromISO(state.charge.charge_date).toJSDate()
+          state.charge_date = DateTime.fromISO(state.charge.charge_date).toJSDate()
         })
     }
     visible.value = true
   }
   function hide() {
-    console.log('hide')
     visible.value = false
     state.charge = {...blankCharge}
   }
@@ -70,7 +77,7 @@
   <slot name="activator" :activate="show"></slot>
   <v-dialog v-model="visible" persistent max-width="600px"> 
     <v-skeleton-loader
-      v-if="(props.chargeRef && !state.charge.charge_ref)"
+      v-if="(props.chargeId && !state.charge.charge_id)"
       class="mx-auto"
       max-width="600px"
       width="100%"
@@ -79,7 +86,7 @@
     <v-card
       v-else
       prepend-icon="mdi-elephant"
-      :title="`Charge ${ chargeRef }`"
+      :title="`Charge ${ chargeId }`"
     >
       <v-card-text>
         <v-form
@@ -100,7 +107,7 @@
               <v-date-input
                 label="Charge Date"
                 density="compact"
-                v-model="state.charge.charge_date"
+                v-model="state.charge_date"
                 :rules="[v => !!v || 'Date is required']"                
                 variant="outlined"
               ></v-date-input>
@@ -177,18 +184,14 @@
           </v-row>
         </v-form>
       </v-card-text>
-
       <v-divider></v-divider>
-
       <v-card-actions>
         <v-spacer></v-spacer>
-
         <v-btn
           text="Close"
           variant="plain"
           @click="hide"
         ></v-btn>
-
         <v-btn
           color="primary"
           text="Save"

@@ -19,6 +19,22 @@ module.exports = {
         res.status(500).send({ error: 'an error has occured getting the sponsors: ' + err })
       })
   },
+  indexAvailableForCharge(req, res) {
+    Common.debug(req, 'indexAvailableForCharge')
+
+    req.query.include=req.query.include || -1
+
+    Knex.raw(`SELECT * FROM v_sponsor sp
+              WHERE sp.sponsor_id NOT IN 
+	            (SELECT cp.sponsor_id FROM checkpoint cp WHERE cp.charge_id=? AND cp.checkpoint_id!=?)`, [req.params.charge_id, req.query.include])
+      .then(sponsors => {
+        res.send(sponsors.rows)
+      })
+      .catch(err => {
+        Common.error(req, 'indexAvailableForCharge', err)
+        res.status(500).send({ error: 'an error has occured getting the sponsors: ' + err })
+      })
+  },
   show (req, res) {
     Common.debug(req, 'show')
 

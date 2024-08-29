@@ -17,7 +17,8 @@
     model: null,
     year: null,
     colour: null,
-    registration: null
+    registration: null,
+    car_description: null
   }
   const state = reactive({    
     car: {...blankCar},
@@ -31,6 +32,8 @@
       state.car.make_id = state.selectedMake.make_id
       state.car.make = state.selectedMake.make
     }
+    state.car.car_description = state.car.car_name + ' - ' + (state.car.colour?(' ' + state.car.colour):'') + (state.car.year?(' ' + state.car.year):'')  + (state.car.make?(' ' + state.car.make):'')  + (state.car.model?(' ' + state.car.model):'') + (state.car.registration?(' ' + state.car.registration):'') 
+    state.car.processing_status = 'NO_GPS'
 
     const { valid } = await form.value.validate()
 
@@ -116,7 +119,7 @@
                 label="Make"
                 :items="state.makes"
                 item-title="make"
-                return-object="true"
+                :return-object="true"
                 v-model="state.selectedMake"
                 density="compact"
                 variant="outlined"

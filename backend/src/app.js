@@ -10,7 +10,7 @@ const http = require('http').Server(app)
 const bodyParser = require('body-parser')
 const cors = require('cors')
 const path = require('path')
-const { copyFileSync } = require('fs')
+const fileUpload = require("express-fileupload")
 
 const corsOptions = {
   //origin: config.cors_origin,
@@ -22,6 +22,7 @@ debug('Starting ec23 api server.')
 
 app.set('trust proxy', true)
 app.use(bodyParser.json())
+app.use(fileUpload())
 app.use(cors(corsOptions))
 app.options('*', cors())
 

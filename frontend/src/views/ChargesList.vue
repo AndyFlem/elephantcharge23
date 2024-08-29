@@ -1,11 +1,11 @@
 <script setup>
   // import { onMounted } from 'vue'
-  import { inject, reactive, computed } from 'vue'
+  import { inject, reactive} from 'vue'
   import { parseISO } from 'date-fns'
   import { format } from 'd3'
   import { DateTime } from 'luxon'
   import ChargeForm from './ChargeForm.vue'
-import router from '@/router'
+  import router from '@/router'
 
   const axiosPlain = inject('axiosPlain')
 
@@ -21,21 +21,6 @@ import router from '@/router'
       }).sort((a,b) => b.charge_date - a.charge_date)
     })
 
-  const charges = computed(() => {
-    return state.charges.map(t => {
-      return {
-        charge_ref: t.charge_ref,
-        charge_link: {charge_name: t.charge_name, charge_ref: t.charge_ref},
-        charge_date: t.charge_date,
-        entry_count: t.entry_count,
-        completed: {pct: t.entry_completed_pct, count: t.entry_completed_count},
-        raised_dollars: t.raised_dollars,
-        dollars_per_entry: t.dollars_per_entry,
-        new_teams_count: t.new_teams_count,
-        status: {charge_complete: t.charge_complete, result_complete: t.result_complete}
-      }
-    })
-  })
   const formatCurrency = (value) => {
     return format(',.0f')(value)
   }
@@ -73,7 +58,7 @@ import router from '@/router'
   ]  
 
   function chargeCreated(charge) {
-    router.push({name: 'Charge', params: {charge_ref: charge.charge_ref}})
+    router.push({name: 'Charge', params: {charge_id: charge.charge_id}})
   }
 </script>
 
@@ -84,7 +69,7 @@ import router from '@/router'
         <v-card v-if="state.charges" class="mx-auto">
           <v-data-table
             :headers="chargesTableHeaders"
-            :items="charges"
+            :items="state.charges"
             item-value="name"
             items-per-page="-1"
             class="elevation-1"
@@ -97,15 +82,15 @@ import router from '@/router'
           >
               {{ heder.hasOwnProperty('formatter') ? heder.formatter(value) : value}}
           </template>
-          <template v-slot:[`item.charge_link`]="{  value }">
-              <router-link :to="'/charge/' + value.charge_ref">{{ value.charge_name }}</router-link>
+          <template v-slot:[`item.charge_link`]="{  item }">
+              <router-link :to="'/charge/' + item.charge_id">{{ item.charge_name }}</router-link>
           </template>
-          <template v-slot:[`item.completed`]="{ value }">
-              {{ value.count }} ({{ format(',.0%')(value.pct) }})
+          <template v-slot:[`item.completed`]="{ item }">
+              {{ item.count }} ({{ format(',.0%')(item.pct) }})
           </template>
-          <template v-slot:[`item.status`]="{ value }">
-            <v-chip :color="colorStatus(value)">
-              {{ formatStatus(value) }}
+          <template v-slot:[`item.status`]="{ item }">
+            <v-chip :color="colorStatus(item)">
+              {{ formatStatus(item) }}
             </v-chip>            
           </template>
           <template v-slot:[`item.charge_ref`]="{ index }">

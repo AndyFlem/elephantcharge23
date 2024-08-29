@@ -92,13 +92,14 @@
             density="compact"
           >
             <template v-slot:item.actions="{ item }">
-              <sponsorForm :sponsor-id="item.sponsor_id" @sponsor-updated="sponsorUpdated">
+              <SponsorForm :sponsor-id="item.sponsor_id" @sponsor-updated="sponsorUpdated">
                 <template #activator="{ activate }">
                   <v-btn size="x-small" variant="flat" @click="activate" icon="mdi-pencil"></v-btn>
                 </template>
-              </sponsorForm>
+              </SponsorForm>
               <v-btn v-if="(item.charge_count + item.checkpoint_count) == 0" size="x-small" variant="flat" @click="deleteSponsor(item)" icon="mdi-delete"></v-btn>
             </template>
+            <template #bottom></template>
           </v-data-table>
         </v-card>
       </v-col>

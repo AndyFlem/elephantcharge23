@@ -1,7 +1,7 @@
 const config = require('../config/config')
 const debug = require('debug')('ec23:db')
-
 var pg = require('pg')
+
 pg.types.setTypeParser(20, 'text', parseInt)
 pg.types.setTypeParser(1082, (value) => value)
 
@@ -30,7 +30,7 @@ const knex = require('knex')({
 })
 
 knex.on( 'query', function( queryData ) {
-  debug( queryData.sql )
+  //debug( queryData.sql + ': '+  queryData.bindings )
 })
 
 module.exports = knex

@@ -99,7 +99,7 @@
                 </template>
               </CarForm>
               <v-btn v-if="item.entry_count == 0" size="x-small" variant="flat" @click="deleteCar(item)" icon="mdi-delete"></v-btn>
-            </template>               
+            </template> 
             <template #bottom></template>
           </v-data-table>
         </v-card>

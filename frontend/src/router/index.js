@@ -16,13 +16,13 @@ const routes = [
         name: 'Charges',
         component: () => import(/* webpackChunkName: "charges" */ '@/views/ChargesList.vue'),
       }, {
-        path: '/charge/:charge_ref',
+        path: '/charge/:charge_id',
         name: 'Charge',
         component: () => import(/* webpackChunkName: "charge" */ '@/views/ChargeDetails.vue'),
       }, {
-        path: '/charge/:charge_ref/entry/:car_no',
+        path: '/entry/:entry_id',
         name: 'Entry',
-        component: () => import(/* webpackChunkName: "charge" */ '@/views/TheEntry.vue'),
+        component: () => import(/* webpackChunkName: "charge" */ '@/views/EntryDetails.vue'),
       },{
         path: '/teams',
         name: 'Teams',

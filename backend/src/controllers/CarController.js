@@ -13,9 +13,35 @@ module.exports = {
 
     Knex('v_car')      
       .select()
-      .then(cars => res.send(cars))
+      .then(cars => {
+        cars=cars.map(c=>{
+          c.car_description=c.car_name + ' - ' + (c.colour?(' ' + c.colour):'') + (c.year?(' ' + c.year):'')  + (c.make?(' ' + c.make):'')  + (c.model?(' ' + c.model):'') + (c.registration?(' ' + c.registration):'') + ', last charge: ' + c.last_charge
+          return c
+        })
+        res.send(cars)
+      })
       .catch(err => {
         Common.error(req, 'index', err)
+        res.status(500).send({ error: 'an error has occured getting the cars: ' + err })
+      })
+  },
+  indexAvailableForCharge(req, res) {
+    Common.debug(req, 'indexAvailableForCharge')
+
+    req.query.include=req.query.include || -1
+
+    Knex.raw(`SELECT * FROM v_car cr
+              WHERE cr.car_id NOT IN 
+	            (SELECT car.car_id FROM car INNER JOIN entry e ON car.car_id=e.car_id WHERE e.charge_id=? AND e.entry_id!=?)`, [req.params.charge_id, req.query.include])
+      .then(cars => {
+        cars=cars.rows.map(c=>{
+          c.car_description=c.car_name + ' - ' + (c.colour?(' ' + c.colour):'') + (c.year?(' ' + c.year):'')  + (c.make?(' ' + c.make):'')  + (c.model?(' ' + c.model):'') + (c.registration?(' ' + c.registration):'') + ', last charge: ' + c.last_charge
+          return c
+        })
+        res.send(cars)
+      })
+      .catch(err => {
+        Common.error(req, 'indexAvailableForCharge', err)
         res.status(500).send({ error: 'an error has occured getting the cars: ' + err })
       })
   },
