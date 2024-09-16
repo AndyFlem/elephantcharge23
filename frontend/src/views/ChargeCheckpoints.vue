@@ -1,5 +1,5 @@
 <script setup>
-  import { reactive, inject, watch, computed } from 'vue'
+  import { reactive, inject, watch } from 'vue'
   import { format } from 'd3'
   
   import CheckpointForm from './CheckpointForm.vue'
@@ -15,31 +15,6 @@
 
   const state = reactive({
     checkpoints: null
-  })
-
-  const map_center = computed(() => {
-    if (props.charge.map_center) {
-      let pnt=JSON.parse(props.charge.map_center)
-      return pnt.coordinates
-    } else {
-      return false
-    }
-  })
-  const checkpointMarkers = computed(() => {
-    if (state.checkpoints) {
-      return {
-        type: "FeatureCollection",
-        features: state.checkpoints.map(c => {
-          return {
-            type: 'Feature',
-            properties: {name: c.short_name? c.short_name : c.sponsor_name},
-            geometry: JSON.parse(c.location)
-          }
-        })
-      }
-    } else {
-      return {}
-    }
   })
 
   watch(()=>props.charge, () => {
@@ -95,62 +70,64 @@
 <template>
   <v-row>
     <v-col class="" cols="12" sm="8">
-      <v-card v-if="state.checkpoints" class="mx-auto">
-        <v-data-table
-          :headers="checkpointTableHeaders"
-          :items="state.checkpoints"
-          item-value="name"
-          items-per-page="-1"
-          class="elevation-1"
-          density="compact"
+      <v-data-table
+        v-if="state.checkpoints"
+        :headers="checkpointTableHeaders"
+        :items="state.checkpoints"
+        item-value="name"
+        items-per-page="-1"
+        class="elevation-1"
+        density="compact"
+      >
+        <template 
+          v-for="heder in checkpointTableHeaders.filter((h) => (h.hasOwnProperty('formatter')))" 
+          v-slot:[`item.${heder.key}`]="{ value }"
         >
-          <template 
-            v-for="heder in checkpointTableHeaders.filter((h) => (h.hasOwnProperty('formatter')))" 
-            v-slot:[`item.${heder.key}`]="{ value }"
-          >
-              {{ heder.hasOwnProperty('formatter') ? heder.formatter(value) : value}}
-          </template> 
-          <template v-slot:[`item.index`]="{ index }">
-            {{ index+1 }}
-          </template>
-          <template v-slot:[`item.is_gauntlet`]="{ value }">
-            {{ value ? 'Yes' : '' }}
-          </template>
-          <template v-slot:[`item.sponsor_name`]="{ item }">
-            <SponsorForm :sponsor-id="item.sponsor_id" @sponsor-updated="sponsorUpdated(item, $event)">
-              <template #activator="{ activate }">
-                <v-btn size="x-small" variant="flat" @click="activate" icon="mdi-pencil"></v-btn>
-              </template>
-            </SponsorForm>
-            {{ item.sponsor_name }}   
-          </template>
-          <template v-slot:item.actions="{ item }">
-            <CheckpointForm :charge-id="props.charge.charge_id" :checkpoint-id="item.checkpoint_id" @checkpoint-updated="checkpointUpdated">
-              <template #activator="{ activate }">
-                <v-btn size="x-small" title="Edit checkpoint" variant="flat" @click="activate" icon="mdi-pencil"></v-btn>
-              </template>
-            </CheckpointForm>
-            <v-btn title="Delete checkpoint" v-if="item.checkins_count == '0'" size="x-small" variant="flat" @click="deleteCheckpoint(item)" icon="mdi-delete"></v-btn>
-          </template>       
-          <template #bottom></template>      
-        </v-data-table>
-        <v-card-actions class="d-flex">
-          <v-spacer/>
-          <CheckpointUploadForm @checkpoints-imported="checkpointsImported" :charge-id="props.charge.charge_id">
+            {{ heder.hasOwnProperty('formatter') ? heder.formatter(value) : value}}
+        </template> 
+        <template v-slot:[`item.index`]="{ index }">
+          {{ index+1 }}
+        </template>
+        <template v-slot:[`item.is_gauntlet`]="{ value }">
+          {{ value ? 'Yes' : '' }}
+        </template>
+        <template v-slot:[`item.sponsor_name`]="{ item }">
+          <SponsorForm :sponsor-id="item.sponsor_id" @sponsor-updated="sponsorUpdated(item, $event)">
             <template #activator="{ activate }">
-              <v-btn color="primary" variant="flat" @click="activate">Upload Checkpoints KMZ</v-btn>
+              <v-btn size="x-small" variant="flat" @click="activate" icon="mdi-pencil"></v-btn>
             </template>
-          </CheckpointUploadForm>       
-          <CheckpointForm :charge-id="props.charge.charge_id" @checkpoint-created="checkpointCreated">
+          </SponsorForm>
+          {{ item.sponsor_name }}   
+        </template>
+        <template v-slot:item.actions="{ item }">
+          <CheckpointForm :charge-id="props.charge.charge_id" :checkpoint-id="item.checkpoint_id" @checkpoint-updated="checkpointUpdated">
             <template #activator="{ activate }">
-              <v-btn color="primary" variant="flat" @click="activate">Add Checkpoint</v-btn>
+              <v-btn size="x-small" title="Edit checkpoint" variant="flat" @click="activate" icon="mdi-pencil"></v-btn>
             </template>
-          </CheckpointForm> 
-        </v-card-actions>  
-      </v-card>
+          </CheckpointForm>
+          <v-btn title="Delete checkpoint" v-if="item.checkins_count == '0'" size="x-small" variant="flat" @click="deleteCheckpoint(item)" icon="mdi-delete"></v-btn>
+        </template>       
+        <template #bottom>
+          <v-row class="mt-2 mb-2 mr-2">
+            <v-col cols="12" class="d-flex">
+              <v-spacer/>
+              <CheckpointUploadForm @checkpoints-imported="checkpointsImported" :charge-id="props.charge.charge_id">
+                <template #activator="{ activate }">
+                  <v-btn color="primary" class="mr-2" variant="flat" @click="activate">Upload Checkpoints KMZ</v-btn>
+                </template>
+              </CheckpointUploadForm>       
+              <CheckpointForm :charge-id="props.charge.charge_id" @checkpoint-created="checkpointCreated">
+                <template #activator="{ activate }">
+                  <v-btn color="primary" variant="flat" @click="activate">Add Checkpoint</v-btn>
+                </template>
+              </CheckpointForm>
+            </v-col>
+          </v-row>
+        </template>      
+      </v-data-table>
     </v-col>
     <v-col cols="12" sm="4">
-      <MapPanel :checkpoints="checkpointMarkers" :charge="props.charge" />
+      <MapPanel :charge="props.charge" showChargeLegs/>
     </v-col>
   </v-row>
 </template>

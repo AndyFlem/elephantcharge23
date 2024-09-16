@@ -54,7 +54,7 @@ module.exports = {
   update (req, res) {
     Common.debug(req, 'update')
 
-    const oUpdate = {team_name: req.body.team_name, team_ref: req.body.team_ref, captain: req.body.captain, website: req.body.website, email: req.body.email}
+    const oUpdate = {team_name: req.body.team_name, team_ref: req.body.team_ref, captain: req.body.captain, website: req.body.website, email: req.body.email, color: req.body.color}
 
     Knex('team')
       .update(oUpdate)      
@@ -68,7 +68,7 @@ module.exports = {
   create (req, res) {
     Common.debug(req, 'create')
 
-    const oInsert = {team_name: req.body.team_name, team_ref: req.body.team_ref, captain: req.body.captain, website: req.body.website, email: req.body.email}
+    const oInsert = {team_name: req.body.team_name, team_ref: req.body.team_ref, captain: req.body.captain, website: req.body.website, email: req.body.email, color: req.body.color}
 
     Knex('team')
       .insert(oInsert)      

@@ -135,7 +135,12 @@
                 placeholder="camel@gmail.com"
                 variant="outlined"
               ></v-text-field>
-            </v-col>            
+            </v-col>         
+          </v-row>
+          <v-row>
+            <v-col cols="12">
+              <v-color-picker hide-inputs v-model="state.team.color"/>
+            </v-col>
           </v-row>
         </v-form>
       </v-card-text>

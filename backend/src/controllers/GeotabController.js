@@ -27,18 +27,12 @@ module.exports = {
   deviceInfo (req, res) {
     Common.debug(req, 'deviceInfo')
 
-    let add = 0
-    if (req.query.offset24hr) {
-      add = 1
-    }
     SqlServer(`
       SELECT TOP 10 
-        DATEADD(dd,${add},CONVERT(date,dtDateTime)) as date,
-        CONVERT(date,dtDateTime) as record_date,
+        CONVERT(date,dtDateTime) as date,
         count(*) as points
       FROM GPSData WHERE iVehicleID = ${req.params.device_id} 
       GROUP BY 
-        DATEADD(dd,${add},CONVERT(date,dtDateTime)),
         CONVERT(date,dtDateTime)
       ORDER BY 
         CONVERT(date,dtDateTime) desc;`)
@@ -54,20 +48,34 @@ module.exports = {
   // Import raw data from the Geotab SQL Server
   // Clean the raw data and produce clean data and stops
   // Prepare geometry for the raw and clean data
-  importRaw (req, entry_id, device_id, date, offset24hr) {
+  importRaw (req, entry_id, device_id, date, offsetMinutes) {
     Common.debug(null, 'importRaw')
 
-    let add = 0
-    if (offset24hr) {
-      add = 1
-    }
-
+    let charge
+    let add
+    
     let counts
     return Knex.transaction(function (trx) {
+      Knex('entry')
+        .where({entry_id: entry_id})
+        .select(['charge_id'])
+        .transacting(trx)
+      .then(chrgids=>{
+        return Knex('charge')
+          .where({charge_id: chrgids[0].charge_id})
+          .select()
+          .transacting(trx)
+      })
+      .then(chrgs=>{
+        charge=chrgs[0]
+
+        add = DateTime.fromISO(charge.charge_date).diff(DateTime.fromISO(date),'days').days
+    
         return SqlServer(`SELECT * FROM GPSData WHERE iVehicleID = ${device_id} AND 
           CONVERT(date,dtDateTime) = '${date}' ORDER BY dtDateTime`)
+        })
         .then(rows=>{
-          return GPSCommon.importRaw(req, trx, entry_id, rows.map(v=>{return {datetime: DateTime.fromJSDate(v.dtDateTime), lat: v.fLatitude, lon: v.fLongitude}}), add)
+          return GPSCommon.importRaw(req, trx, entry_id, rows.map(v=>{return {datetime: DateTime.fromJSDate(v.dtDateTime), lat: v.fLatitude, lon: v.fLongitude}}), add, offsetMinutes)
         })
         .then(cnts => {
           counts = cnts
@@ -75,7 +83,8 @@ module.exports = {
             .update({
               processing_status: counts.clean_count > 0 ? 'CLEAN' : 'NO_GPS', 
               gps_source_ref: counts.clean_count > 0 ? 'GEOTAB' : null,
-              geotab_device_id: counts.clean_count > 0 ? device_id : null
+              geotab_device_id: counts.clean_count > 0 ? device_id : null,
+              gps_offset_days: counts.clean_count > 0 ? add : null
             })
             .where({entry_id: entry_id})
             .transacting(trx)    

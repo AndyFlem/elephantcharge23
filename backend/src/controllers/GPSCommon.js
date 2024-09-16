@@ -5,8 +5,7 @@ const Common = require('./CommonDebug')('GPSCommon')
 const config = require('../config/config')
 
 module.exports = {
-  async importRaw(req, trx, entry_id, rows, offsetDays) {
-
+  async importRaw(req, trx, entry_id, rows, offsetDays, offsetMinutes) {
     let cleans_count = 0
     let stops
 
@@ -16,7 +15,7 @@ module.exports = {
       Knex.raw(`INSERT INTO gps_raw (entry_id, gps_timestamp, location, location_prj) 
         VALUES (
           ${entry_id}, 
-          '${row.datetime.plus({days: offsetDays}).toISO()}', 
+          '${row.datetime.plus({days: offsetDays, minutes: offsetMinutes}).toISO()}', 
           ST_Point(${row.lon},${row.lat}, 4326),
           ST_Transform(ST_Point(${row.lon},${row.lat}, 4326),${config.local_crs})
           )`
@@ -161,7 +160,6 @@ function insertClean(req, trx, entry_id, gps_timestamp, x, y, stop_id) {
       throw err
     })
 }
-
 
 function findStops(req, trx, raws) {
   Common.debug(null, 'findStops')

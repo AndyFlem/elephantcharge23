@@ -20,6 +20,10 @@ const routes = [
         name: 'Charge',
         component: () => import(/* webpackChunkName: "charge" */ '@/views/ChargeDetails.vue'),
       }, {
+        path: '/charge/:charge_id/results',
+        name: 'Charge Results',
+        component: () => import(/* webpackChunkName: "charge" */ '@/views/ChargeResults.vue'),
+      }, {
         path: '/entry/:entry_id',
         name: 'Entry',
         component: () => import(/* webpackChunkName: "charge" */ '@/views/EntryDetails.vue'),
@@ -37,7 +41,10 @@ const routes = [
         component: () => import(/* webpackChunkName: "charges" */ '@/views/SponsorsList.vue'),
       },  
     ],
-  },
+  },{
+    path: '/charge/:charge_id/live',
+    component: () => import('@/layouts/default/LiveMap.vue')
+  }
 ]
 
 const router = createRouter({

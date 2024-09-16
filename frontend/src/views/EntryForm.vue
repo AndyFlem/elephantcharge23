@@ -28,7 +28,8 @@
     distance_total_competition: 0,
     raised_dollars: 0,
     distance_total: 0,
-    distance_net: 0
+    distance_net: 0,
+    imei: null,
   }
   const state = reactive({    
     entry: {...blankEntry},
@@ -40,7 +41,8 @@
     classes: null,
     selectedClass: null,
     categories: null,
-    selectedCategories: []
+    selectedCategories: [],
+    imeis: null
   })
 
   const ready = computed(() => { 
@@ -119,6 +121,11 @@
       axiosPlain.get(`/charge/${props.chargeId}/carNosAvailable`)
       .then(rows => {
         state.carNosAvailable = rows.data 
+      }),
+      axiosPlain.get(`/teltonika/imeis`)
+      .then(rows => {
+        state.imeis = rows.data
+        state.imeis.splice(0, 0, {imei: null})
       })]
     )
     .then(()=>{
@@ -284,6 +291,19 @@
                 variant="outlined"
               ></v-text-field>
             </v-col>                                                         
+          </v-row>
+          <v-row>
+            <v-col cols="6"  class="pt-4 pb-1">
+              <v-select
+                label="Teltonika Device IMEI" 
+                :items="state.imeis"
+                item-title="imei"
+                item-value="imei"
+                v-model="state.entry.imei"
+                density="compact"
+                variant="outlined"
+              ></v-select>
+            </v-col>
           </v-row>
         </v-form>
       </v-card-text>

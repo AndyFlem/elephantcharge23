@@ -62,6 +62,80 @@ module.exports = {
       })
   },
   
+  awards(req, res) {
+    Common.debug(req, 'awards')
+
+    let awards
+
+    Knex.transaction(function (trx) {
+      return Knex('v_award')
+        .select()
+        .transacting(trx) 
+        .then(awds=>{
+          awards = awds
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+      })
+      .then(() => {
+        res.send(awards)
+      })
+      .catch(err => {
+        Common.error(req, 'awards', err)
+        res.status(500).send({ error: 'an error has occured getting the awards: ' + err })
+      })
+  },
+  distanceAwardResults(req, res) {
+    Common.debug(req, 'distanceAwardResults')
+
+    let awards
+
+    Knex.transaction(function (trx) {
+      return Knex('v_distanceawardresults')
+        .where({charge_id: req.params.charge_id, award_id: req.params.award_id})
+        .select()
+        .transacting(trx) 
+        .then(awds=>{
+          awards = awds
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+      })
+      .then(() => {
+        res.send(awards)
+      })
+      .catch(err => {
+        Common.error(req, 'distanceAwardResults', err)
+        res.status(500).send({ error: 'an error has occured getting the distance award results: ' + err })
+      })
+  },
+
+  legs(req, res) {
+    Common.debug(req, 'legs')
+
+    let legs
+
+    Knex.transaction(function (trx) {
+      return Knex('v_leg')
+        .where({charge_id: req.params.charge_id})
+        .orderBy('is_gauntlet','desc')
+        .orderBy('is_tsetse','desc')
+        .select()
+        .transacting(trx) 
+        .then(lgs=>{
+          legs = lgs
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+      })
+      .then(() => {
+        res.send(legs)
+      })
+      .catch(err => {
+        Common.error(req, 'legs', err)
+        res.status(500).send({ error: 'an error has occured getting the legs: ' + err })
+      })
+  },
 
   // =======================
   // WRITE
@@ -106,7 +180,7 @@ module.exports = {
         Common.error(req, 'create', err)
         res.status(500).send({ error: 'an error has occured creating the charge: ' + err })
       })
-  }, 
+  },
   update (req, res) {
     Common.debug(req, 'update')
 
@@ -120,7 +194,7 @@ module.exports = {
         Common.error(req, 'update', err)
         res.status(500).send({ error: 'an error has occured updating the charge: ' + err })
       })
-  },  
+  },
   delete (req, res) {
     Common.debug(req, 'delete')
 
@@ -132,6 +206,84 @@ module.exports = {
         Common.error(req, 'delete', err)
         res.status(500).send({ error: 'an error has occured deleting the charge: ' + err })
       })
-  },  
+  },
+  createTsetse (req, res) {
+    Common.debug(req, 'createTsetse')
 
+    let charge
+
+    Knex.transaction(function (trx) {
+      return ChargeCommon.getChargeById(req, trx, req.params.charge_id)
+        .then(chge => {
+          charge = chge
+          let qry = Knex('charge')
+            .where({charge_id: charge.charge_id})
+    
+          if (!charge.tsetse1_leg_id) {
+            qry.update({tsetse1_leg_id: req.body.leg_id})
+          } else {
+            if (!charge.tsetse2_leg_id) {
+              qry.update({tsetse2_leg_id: req.body.leg_id})
+            }  
+          }
+          
+          return qry
+            .transacting(trx)
+        })
+        .then(() => {
+          return Knex('leg')
+            .update({is_tsetse: true})
+            .where({leg_id: req.body.leg_id})
+            .transacting(trx)
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(() => {
+      res.send({result:'ok'})
+    })
+    .catch(err => {
+      Common.error(req, 'createTsetse', err)
+      res.status(500).send({ error: 'an error has occured creating the tsetse: ' + err })
+    })    
+  },
+  deleteTsetse (req, res) {
+    Common.debug(req, 'deleteTsetse')
+    
+    let charge
+
+    Knex.transaction(function (trx) {
+      return ChargeCommon.getChargeById(req, trx, req.params.charge_id)
+        .then(chge => {
+          charge = chge
+          let qry = Knex('charge')
+            .where({charge_id: charge.charge_id})
+    
+          if (charge.tsetse1_leg_id == req.params.leg_id) {
+            qry.update({tsetse1_leg_id: null})
+          } 
+          if (!charge.tsetse2_leg_id == req.params.leg_id) {
+            qry.update({tsetse2_leg_id: null})
+          }
+          
+          return qry
+            .transacting(trx)
+        })
+        .then(() => {
+          return Knex('leg')
+            .update({is_tsetse: false})
+            .where({leg_id: req.params.leg_id})
+            .transacting(trx)
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(() => {
+      res.send({result:'ok'})
+    })
+    .catch(err => {
+      Common.error(req, 'deleteTsetse', err)
+      res.status(500).send({ error: 'an error has occured deleting the tsetse: ' + err })
+    })
+  }  
 }

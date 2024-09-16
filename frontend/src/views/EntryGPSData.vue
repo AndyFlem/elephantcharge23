@@ -26,7 +26,8 @@
     },
     gpx: {
       file: null
-    }
+    },
+    offsetMinutes: 0
   })
   const alerts = reactive({
     visible:false,
@@ -60,7 +61,7 @@
     
   watch(()=>state.geotab.selected, newVal => {
     state.geotab.info = null
-    axiosPlain.get('/geotab/' + newVal.iID + '/info' + (state.geotab.offset24hr ? '?offset24hr=true' : ''))
+    axiosPlain.get('/geotab/' + newVal.iID + '/info')
       .then(rows => {
         state.geotab.info = rows.data
       })
@@ -82,7 +83,7 @@
   }
 
   function importGeotab(item) {
-    axiosLong.post('/entry/' + props.entry.entry_id + '/importGeotab' + (state.geotab.offset24hr ? '?offset24hr=true' : ''), {device_id: state.geotab.selected.iID  ,date: DateTime.fromISO(item.record_date).toISODate()})
+    axiosLong.post('/entry/' + props.entry.entry_id + '/importGeotab', {device_id: state.geotab.selected.iID , date: DateTime.fromISO(item.date).toISODate(), offsetMinutes: state.offsetMinutes})
       .then(counts => {
         emit('entryGpsUpdated', counts.data.count)
         hide()
@@ -140,14 +141,15 @@
               density="compact"
               variant="outlined"
             ></v-select>
-            <v-checkbox
-              label="Apply 24hr Offset?"
-              density="compact"
-              v-model="state.geotab.offset24hr"
-              variant="outlined"
-            ></v-checkbox>
-          </v-col>   
+          </v-col>
           <v-col v-if="state.geotab.info" cols="12" class="pt-0">
+            <v-text-field
+              label="Raw offset minutes"
+              density="compact"
+              v-model="state.offsetMinutes"
+              variant="outlined"
+            ></v-text-field>
+    
             <v-data-table
               :headers="geotabInfoHeaders"
               :items="state.geotab.info"
@@ -161,7 +163,7 @@
                   {{ heder.hasOwnProperty('formatter') ? heder.formatter(value) : value}}
               </template> 
               <template v-slot:item.actions="{ item }">
-                <v-btn v-if="DateTime.fromISO(item.date).toISODate() == props.charge.charge_date" size="small" variant="flat" @click="importGeotab(item)" icon="mdi-import"></v-btn>
+                <v-btn size="small" variant="flat" @click="importGeotab(item)" icon="mdi-import"></v-btn>
               </template>                  
               <template #bottom></template> 
               </v-data-table>

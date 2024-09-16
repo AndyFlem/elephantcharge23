@@ -8,21 +8,29 @@ const CarController = require('./controllers/CarController')
 const SponsorController = require('./controllers/SponsorController')
 const GeotabController = require('./controllers/GeotabController')
 const CheckpointController = require('./controllers/CheckpointController')
+const TeltonikaController = require('./controllers/TeltonikaController')
 
 module.exports = (app) => {
   const prefix = '/api/' + config.api_version
 
   app.get(prefix + '/charges', ChargeController.index)
   app.get(prefix + '/charge/:charge_id', ChargeController.show)
+  app.get(prefix + '/charge/:charge_id/legs', ChargeController.legs)
   app.post(prefix + '/charge', ChargeController.create)
   app.put(prefix + '/charge/:charge_id', ChargeController.update)
   app.delete(prefix + '/charge/:charge_id', ChargeController.delete) 
   app.post(prefix + '/charge/:charge_id/checkpointsFromKML', CheckpointController.createFromKML)
+  app.post(prefix + '/charge/:charge_id/tsetse', ChargeController.createTsetse)
+  app.delete(prefix + '/charge/:charge_id/tsetse/:leg_id', ChargeController.deleteTsetse)
 
   app.get(prefix + '/charge/:charge_id/carNosAvailable', ChargeController.carNosAvailable)
   app.get(prefix + '/charge/:charge_id/update_distances', ChargeController.updateDistances)
 
+  app.get(prefix + '/awards', ChargeController.awards)
+  app.get(prefix + '/charge/:charge_id/distance_results/:award_id', ChargeController.distanceAwardResults)
+  
   app.get(prefix + '/charge/:charge_id/entries', EntryController.index)
+
   app.get(prefix + '/entry/:entry_id', EntryController.show)
   app.get(prefix + '/entry/:entry_id/geometry', EntryController.showGeometry)
 
@@ -38,6 +46,7 @@ module.exports = (app) => {
   app.get(prefix + '/entry/:entry_id/update_distances', EntryController.updateDistances)
   app.get(prefix + '/entry/:entry_id/calculate_checkins', EntryController.calculateCheckins)
   app.put(prefix + '/entry/:entry_id/update_checkpoint_card', EntryController.updateCheckpointCard)
+  app.delete(prefix + '/entry/:entry_id/checkin/:checkin_id', EntryController.deleteCheckin)
 
   app.post(prefix + '/entry/:entry_id/importGeotab', EntryController.importGeotab)
   app.post(prefix + '/entry/:entry_id/importGpx', EntryController.importGpx)
@@ -75,4 +84,10 @@ module.exports = (app) => {
   
   app.get(prefix + '/geotab/devices', GeotabController.indexDevices)
   app.get(prefix + '/geotab/:device_id/info', GeotabController.deviceInfo)
+  
+  app.get(prefix + '/teltonika/imeis', TeltonikaController.indexIMEIs)
+  app.get(prefix + '/charge/:charge_id/teltonika_entries', TeltonikaController.indexEntries)
+  app.get(prefix + '/teltonika/:imei/recent_track', TeltonikaController.recentTrack)
+  
+  
 }

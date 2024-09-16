@@ -4,10 +4,14 @@ const config = {
     api_version: 'v1',
     local_crs: 3857,
     db:{
-        database: 'charge23',
-        user: 'elephant_charge',
-        password: 'extramild20'
-
+      database: 'charge23',
+      user: 'elephant_charge',
+      password: 'extramild20'
+    },
+    teltonika:{
+      database: 'teltonika',
+      user: 'postgres',
+      password: 'extramild20'
     },
     geotab:{
       server: '172.27.208.1', //For SQL on Win Host and this app on WSL, this is the WSL address given by: ip route show | grep -i default | awk '{ print $3}'

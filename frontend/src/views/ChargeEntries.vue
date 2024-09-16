@@ -21,8 +21,6 @@
         })    
   }, { immediate: true })
   
-
-
   const sortStatus = (value) => {
     if (value.result_status) {
       if (value.result_status == 'COMPLETE') { return value.distance_total_competition } else { return 2000 }
@@ -70,18 +68,18 @@
 <template>
   <v-row>
     <v-col class="" cols="12">
-      <v-card v-if="state.entries" class="mx-auto">
-        <v-data-table
-          :headers="entryTableHeaders"
-          :items="state.entries"
-          item-value="name"
-          items-per-page="-1"
-          class="elevation-1"
-          density="compact"
-          :custom-key-sort="{
-            'status': (a,b) => sortStatus(a)-sortStatus(b),
-            }"
-        >
+      <v-data-table
+        v-if="state.entries"
+        :headers="entryTableHeaders"
+        :items="state.entries"
+        item-value="name"
+        items-per-page="-1"
+        class="elevation-1"
+        density="compact"
+        :custom-key-sort="{
+          'status': (a,b) => sortStatus(a)-sortStatus(b),
+          }"
+      >
         <template 
           v-for="heder in formatters" 
           v-slot:[`item.${heder.key}`]="{ _header, value }"
@@ -97,25 +95,35 @@
             {{ format.entryStatusDescription(item) }}
           </v-chip>            
         </template>
+        <template v-slot:item.car_no="{ item }">
+          <v-chip variant="elevated" style="min-width: 40px;" :color="item.color">{{ item.car_no }}</v-chip>
+        </template>        
         <template v-slot:item.actions="{ item }">
-            <EntryForm :charge-id="props.charge.charge_id" :entry-id="item.entry_id" @entry-updated="entryUpdated">
-              <template #activator="{ activate }">
-                <v-btn size="x-small" title="Edit entry" variant="flat" @click="activate" icon="mdi-pencil"></v-btn>
-              </template>
-            </EntryForm>
-            <v-btn title="Delete entry" v-if="item.processing_status == 'NO_GPS'" size="x-small" variant="flat" @click="deleteEntry(item)" icon="mdi-delete"></v-btn>
-          </template>    
-          <template #bottom></template>      
-        </v-data-table>
-        <v-card-actions class="d-flex">
-          <v-spacer/>
-          <EntryForm :charge-id="props.charge.charge_id" @entry-created="entryCreated">
+          <EntryForm :charge-id="props.charge.charge_id" :entry-id="item.entry_id" @entry-updated="entryUpdated">
             <template #activator="{ activate }">
-              <v-btn color="primary" variant="flat" @click="activate">Add Entry</v-btn>
+              <v-btn size="x-small" title="Edit entry" variant="flat" @click="activate" icon="mdi-pencil"></v-btn>
             </template>
-          </EntryForm>          
-        </v-card-actions>  
-      </v-card>      
+          </EntryForm>
+          <v-btn title="Delete entry" v-if="item.processing_status == 'NO_GPS'" size="x-small" variant="flat" @click="deleteEntry(item)" icon="mdi-delete"></v-btn>
+        </template>    
+        <template #bottom>
+          <v-row class="mt-2 mb-2 mr-2">
+            <v-col cols="12" class="d-flex">
+              <v-spacer/>
+              <EntryForm :charge-id="props.charge.charge_id" @entry-created="entryCreated">
+              <template #activator="{ activate }">
+                <v-btn color="primary" variant="flat" @click="activate">Add Entry</v-btn>
+              </template>
+            </EntryForm>  
+            </v-col>
+          </v-row>
+        </template>      
+      </v-data-table>     
     </v-col>
   </v-row>
 </template>
+<style>
+  .v-chip__content {
+    margin: auto;
+  }
+</style>

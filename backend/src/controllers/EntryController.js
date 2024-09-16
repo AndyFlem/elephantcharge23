@@ -205,7 +205,7 @@ module.exports = {
   create (req, res) {
     Common.debug(req, 'create')
 
-    const oInsert = {charge_id: req.body.charge_id, class_id: req.body.class_id, car_id: req.body.car_id, team_id: req.body.team_id, entry_name: req.body.entry_name, car_no: req.body.car_no, processing_status:'NO_GPS', captain: req.body.captain, members: req.body.members, raised_local: req.body.raised_local}
+    const oInsert = {charge_id: req.body.charge_id, class_id: req.body.class_id, car_id: req.body.car_id, team_id: req.body.team_id, entry_name: req.body.entry_name, car_no: req.body.car_no, processing_status:'NO_GPS', captain: req.body.captain, members: req.body.members, raised_local: req.body.raised_local, imei: req.body.imei}
     let entryId
 
     if (!req.body.category_ids) { req.body.category_ids=[] }
@@ -244,7 +244,7 @@ module.exports = {
   update (req, res) {
     Common.debug(req, 'update')
 
-    const oUpdate = {class_id: req.body.class_id, car_id: req.body.car_id, team_id: req.body.team_id, entry_name: req.body.entry_name, car_no: req.body.car_no, captain: req.body.captain, members: req.body.members, raised_local: req.body.raised_local}
+    const oUpdate = {class_id: req.body.class_id, car_id: req.body.car_id, team_id: req.body.team_id, entry_name: req.body.entry_name, car_no: req.body.car_no, captain: req.body.captain, members: req.body.members, raised_local: req.body.raised_local, imei: req.body.imei}
 
     Knex.transaction(function (trx) {
       return Knex('entry')
@@ -301,6 +301,25 @@ module.exports = {
         res.status(500).send({ error: 'an error has occured deleting the entry: ' + err })
       })
   },
+  deleteCheckin (req, res) {
+    Common.debug(req, 'delete')
+    Knex.transaction(function (trx) {
+      Knex('checkin')
+        .where({checkin_id: req.params.checkin_id})
+        .delete()
+        .transacting(trx)
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(()=>{
+      return module.exports.doProcessLegs(req, req.params.entry_id)
+    })
+    .then(() => res.send({ message: 'ok' }))
+    .catch(err => {
+      Common.error(req, 'delete', err)
+      res.status(500).send({ error: 'an error has occured deleting the checkin: ' + err })
+    })      
+  },
 
   updateCheckpointCard (req, res) {
     Common.debug(req, 'updateCheckpointCard')
@@ -329,6 +348,7 @@ module.exports = {
     const entry_id = req.params.entry_id
     const device_id = req.body.device_id
     const date = req.body.date
+    const offsetMinutes = req.body.offsetMinutes
     let importCounts
 
     Knex.transaction(function (trx) {
@@ -337,7 +357,7 @@ module.exports = {
         .catch(trx.rollback)
     })
     .then(() => {
-      return GeotabController.importRaw(req, entry_id, device_id, date, req.query.offset24hr)
+      return GeotabController.importRaw(req, entry_id, device_id, date, offsetMinutes)
     })
     .then(cnts => {
       importCounts = cnts
@@ -386,7 +406,7 @@ module.exports = {
           let gpx = req.files.file.data.toString('utf8')
           unfiltered = extractGPX(gpx)
           let rows = unfiltered.filter(v=>v.datetime.diff(DateTime.fromISO(charge.charge_date),'days').days<1)
-          return GPSCommon.importRaw(req, trx, entry_id, rows, 0)
+          return GPSCommon.importRaw(req, trx, entry_id, rows, 0, 0)
         })
         .then(cnts => {
           counts = cnts
@@ -419,6 +439,12 @@ module.exports = {
 
   },
 
+  offsetGps (req, res) {
+    //Delete everything except the raw data
+
+    //Offset the raw data
+  },
+
   clearResult(req, res) {
     Common.debug(req, 'clearResult')
 
@@ -446,30 +472,35 @@ module.exports = {
         return module.exports.doDeleteCheckins(req, trx, entryId)
       })
       .then(()=>{
+        Common.debug(null, 'Delete gps_cleans')
         return Knex('gps_clean')
           .where({entry_id: entryId})
           .delete()
           .transacting(trx)
       })
       .then(()=>{
+        Common.debug(null, 'Delete gps_stops')
         return Knex('gps_stop')
           .where({entry_id: entryId})
           .delete()
           .transacting(trx)  
       })
       .then(()=>{
+        Common.debug(null, 'Delete gps_raw')
         return Knex('gps_raw')
           .where({entry_id: entryId})
           .delete()
           .transacting(trx)  
       })       
       .then(()=>{
+        Common.debug(null, 'Reset entry_geometry')
         return Knex('entry_geometry')
           .where({entry_id: entryId})
           .update({raw_line: null, clean_line: null, raw_line_kml: null, clean_line_kml: null, raw_line_json: null, clean_line_json: null, raws_count: null, cleans_count: null, stops_count: null, raws_from: null, raws_to: null})
           .transacting(trx)
       })
       .then(() => {
+        Common.debug(null, 'Update entry')
         return Knex('entry')
           .update({
             processing_status: 'NO_GPS', 
@@ -515,16 +546,38 @@ module.exports = {
   doDeleteLegs(req, trx, entryId) {
     Common.debug(req, 'doDeleteLegs')
 
-    return Knex('gps_clean')
-      .update({entry_leg_id: null})
+    let entry
+
+    return Knex('entry')
       .where({entry_id: entryId})
       .transacting(trx)
+      .then(ents => {
+        entry = ents[0]
+        return Knex('gps_clean')
+          .update({entry_leg_id: null})
+          .where({entry_id: entryId})
+          .transacting(trx)  
+      })
       .then(() => {
         return Knex('entry_leg')
           .where({entry_id: entryId})
           .delete()
           .transacting(trx)  
-      })   
+      })
+      .then(()=>{
+
+        return Knex('v_leg')
+          .where({charge_id: entry.charge_id, entry_count: 0})
+          .transacting(trx)
+      })
+      .then(legs => {
+        return Promise.all(legs.map(leg => {
+          return Knex('leg')
+            .where({leg_id: leg.leg_id})
+            .delete()
+            .transacting(trx)
+        }))
+      })
   }, 
 
   updateDistances (req, res) {
@@ -820,11 +873,12 @@ module.exports = {
           }
 
           for (let indx = 0; indx <= checkins.length - 2; indx ++) {
-
             if (checkpointDict[checkins[indx].checkpoint_id]) {
               msgs.push('Duplicate checkpoint: ' + checkins[indx].sponsor_name)
             }
-            checkpointDict[checkins[indx].checkpoint_id] = checkins[indx].sponsor_name
+            if (checkins[indx].checkpoint_id == checkins[indx+1].checkpoint_id) {
+              msgs.push('Duplicate checkpoint: ' + checkins[indx].sponsor_name)
+            }
 
             legs.push({
               leg_no: indx + 1,

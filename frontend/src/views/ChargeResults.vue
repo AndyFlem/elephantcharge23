@@ -1,19 +1,19 @@
 <script setup>
-  import { ref, reactive, inject, watch } from 'vue'
+  import { reactive, inject, watch } from 'vue'
   import { useRoute } from 'vue-router'
   import { DateTime } from 'luxon'
 
+  import ChargeResultsAward from './ChargeResultsAward.vue';
   
   const axiosPlain = inject('axiosPlain')
   const route = useRoute()
 
   const state = reactive({
     chargeId: null,
-    charge: null
+    charge: null,
+    awards: null
   })
   
-  const chargeFormShow = ref(false)
-
   watch(
     () => route.params.charge_id,
     chargeId => {
@@ -21,6 +21,10 @@
       axiosPlain.get('/charge/' + chargeId)
           .then(rows => {
             state.charge = rows.data
+            return axiosPlain.get('/awards')
+          })
+          .then(rows => {
+            state.awards = rows.data
           })
     }, { immediate: true }
   )
@@ -41,5 +45,17 @@
         </v-card>
       </v-col>
     </v-row>
+    <template v-if="state.awards">
+      <v-row :key="award.award_id" v-for="award in state.awards">
+        <v-col>
+          <v-card>
+            <v-card-title>{{ award.name }}</v-card-title>
+            <v-card-text>
+              <charge-results-award :charge="state.charge" :award="award" />
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </template>
   </v-container>
 </template>

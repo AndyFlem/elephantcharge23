@@ -40,11 +40,7 @@ export default {
         if (!value) {
           return '-'
         } else {
-          if (value>1000) {
-            return format(',.2r')(value/1000) + ' km'
-          } else {
-            return format(',.2r')(value) + ' m'
-          }  
+          return format(',.4r')(value/1000) + ' km'  
         }
       },
       currency: (value) => {

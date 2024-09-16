@@ -37,7 +37,14 @@ app.use((req, res, next) => {
     req.source = req.body.source
     delete req.body.source
   }
-  debug(`${req.method}: ${req.source}.vue, ${req.baseUrl + req.path} ${JSON.stringify(req.query)} ${JSON.stringify(req.body)}`)
+  let dString = req.method + ' ' + req.baseUrl + req.path
+  if (req.query) {
+    dString += ' Qry: ' + JSON.stringify(req.query)
+  }
+  if (req.form) {
+    dString += ' Frm: ' + JSON.stringify(req.form)
+  }  
+  debug(dString)
 
   next()
 })

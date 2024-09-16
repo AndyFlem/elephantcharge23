@@ -53,6 +53,7 @@
   }
 
   const teamTableHeaders = [
+    {title: '', align: 'middle', sortable: true, key: 'color'},
     {title: 'Team', align: 'start', sortable: true, key: 'team_name'},
     {title: 'Captain', align: 'start', sortable: true, key: 'captain'},
     {title: 'Website', align: 'start', maxWidth:'250', sortable: true, key: 'website'},
@@ -102,6 +103,9 @@
           >
               {{ heder.hasOwnProperty('formatter') ? heder.formatter(value) : value}}
           </template>          
+          <template v-slot:item.color="{ value }">
+            <v-chip variant="elevated" :color="value">&nbsp;&nbsp;</v-chip>
+          </template>
             <template v-slot:item.actions="{ item }">
               <TeamForm :team-id="item.team_id" @team-updated="teamUpdated">
                 <template #activator="{ activate }">

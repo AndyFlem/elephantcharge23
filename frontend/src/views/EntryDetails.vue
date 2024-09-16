@@ -39,9 +39,12 @@
     return axiosPlain.get('/entry/' + state.entryId)
       .then(rows => {
         state.entry = rows.data
+        console.log('entry', state.entry.checkins_inconsistent_message)
         return axiosPlain.get('/charge/' + state.entry.charge_id)
       })
-      .then(rows => state.charge = rows.data)
+      .then(rows =>{
+        state.charge = rows.data
+      })
       .catch(err => {alert('error', 'Error', err)})
   }
 
@@ -52,7 +55,9 @@
       alerts.visible = true
       setTimeout(()=>{alerts.visible = false},3000)    
   }
-
+  function entryUpdated() {
+    getEntry()
+  }
   function entryGPSUpdated(){
     getEntry()
       .then(() => {
@@ -111,7 +116,7 @@
         <v-sheet v-if="state.entry" color="" class="border rounded px-3 py-3">
           <v-row no-gutters>
             <v-col class="d-flex">
-              <v-chip variant="elevated" class="mr-3 mt-1 text-h5" color="primary">{{ state.entry.car_no }}</v-chip> <span class="text-h4">{{ state.entry.entry_name }}</span>
+              <v-chip variant="elevated" class="mr-3 mt-1 text-h5" :color="state.entry.color">{{ state.entry.car_no }}</v-chip> <span class="text-h4">{{ state.entry.entry_name }}</span>
               <v-spacer/>
               <v-chip class="mr-3 mt-2" variant="elevated" :color="format.entryStatusColor(state.entry)">{{ format.entryStatusDescription(state.entry) }}</v-chip>
               <v-menu>
@@ -140,11 +145,11 @@
     </v-row>
     <v-row>
       <EntryLegs v-if="state.entry && state.entry.processing_status=='LEGS'" :charge="state.charge" :entry="state.entry"/>
-      <EntryCheckins v-if="state.entry && state.entry.processing_status=='CHECKINS'" :charge="state.charge" :entry="state.entry"/>      
+      <EntryCheckins v-if="state.entry && state.entry.processing_status=='CHECKINS'" :charge="state.charge" :entry="state.entry" @entry-updated="entryUpdated"/>      
     </v-row>
     <v-row>
       <v-col cols="12" sm="4">
-      <MapPanel v-if="state.entry && state.charge" :entry="state.entry"/>
+      <MapPanel v-if="state.entry && state.charge" :charge="state.charge" :entry="state.entry"/>
     </v-col>
     </v-row>
   </v-container>
