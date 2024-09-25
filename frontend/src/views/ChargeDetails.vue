@@ -65,6 +65,9 @@
                   <v-list-item>
                       <v-btn prepend-icon="mdi-delete" density="compact" variant="text" @click="deleteCharge">Delete charge</v-btn>
                   </v-list-item>
+                  <v-list-item>
+                      <v-btn prepend-icon="mdi-book" density="compact" variant="text" @click="router.push({ name: 'Charge Results', params: { charge_id: state.charge.charge_id } })">Results</v-btn>
+                  </v-list-item>                  
                 </v-list>
               </v-menu>              
             </v-card-title>

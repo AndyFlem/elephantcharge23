@@ -40,6 +40,8 @@ module.exports = (app) => {
 
   app.put(prefix + '/entry/:entry_id/clear_result', EntryController.clearResult)
   app.get(prefix + '/entry/:entry_id/legs', EntryController.legs)
+  app.get(prefix + '/entry/:entry_id/distances', EntryController.distances)
+
   app.get(prefix + '/entry/:entry_id/checkins', EntryController.checkins)
   app.put(prefix + '/entry/:entry_id/process_legs', EntryController.processLegs)
   

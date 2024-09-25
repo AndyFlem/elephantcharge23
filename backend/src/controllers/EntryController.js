@@ -33,7 +33,6 @@ module.exports = {
   // =======================
   // READ
   // =======================
-
   index (req, res) {
     Common.debug(req, 'index')
 
@@ -199,6 +198,29 @@ module.exports = {
         return entries[0]
       })
   },
+  distances(req, res) {
+    Common.debug(req, 'distances')
+
+    let distances
+
+    Knex.transaction(function (trx) {
+      return Knex('v_entry_distance')
+        .where({entry_id: req.params.entry_id}) 
+        .then(dists => {
+          distances=dists
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(() => {
+      res.send(distances)
+    })
+    .catch(err => {
+      Common.error(req, 'distances', err)
+      res.status(500).send({ error: 'An error has occured trying fetch the distances for the entry: ' + err })
+    })
+  },
+
   // =======================
   // WRITE
   // =======================
@@ -244,26 +266,105 @@ module.exports = {
   update (req, res) {
     Common.debug(req, 'update')
 
-    const oUpdate = {class_id: req.body.class_id, car_id: req.body.car_id, team_id: req.body.team_id, entry_name: req.body.entry_name, car_no: req.body.car_no, captain: req.body.captain, members: req.body.members, raised_local: req.body.raised_local, imei: req.body.imei}
+    let category_ids
+    if (req.body.category_ids) {
+      if (req.body.category_ids[0] === null) {
+        category_ids = []
+      } else {
+        category_ids = req.body.category_ids
+      }
+    } else {
+      category_ids = []
+    }
+    
+    const oUpdate = {
+      class_id: req.body.class_id, 
+      car_id: req.body.car_id, 
+      team_id: req.body.team_id, 
+      entry_name: req.body.entry_name, 
+      car_no: req.body.car_no, 
+      captain: req.body.captain, 
+      members: req.body.members, 
+      raised_local: req.body.raised_local, 
+      imei: req.body.imei,
+      dist_penalty_gauntlet: req.body.dist_penalty_gauntlet
+    }
+
+    let entry
+    let charge
+    let net
 
     Knex.transaction(function (trx) {
-      return Knex('entry')
-        .update(oUpdate)
-        .where({entry_id: req.params.entry_id})
+      return module.exports.getEntry(req, trx, req.params.entry_id)
+        .then(ent => {
+          entry = ent
+          return Knex('charge')
+            .where({charge_id: entry.charge_id})
+            .transacting(trx)
+        })
+        .then(charges => {
+          charge = charges[0]
+
+          return Knex('entry')
+            .update(oUpdate)
+            .where({entry_id: req.params.entry_id})
+            .transacting(trx)
+        })
+        .then(()=>{
+          return Knex('entry_category')
+            .transacting(trx)
+            .where({entry_id: req.params.entry_id})
+            .delete()
+        })
+        .then(() => {
+          return Promise.all(category_ids.map(cat => {
+            return Knex('entry_category')
+              .insert({entry_id: req.params.entry_id, category_id: cat})
+              .transacting(trx)
+          }))
+        })
+        /*
+        .then(() => {
+          return new Promise((resolve, reject) => {
+            if (entry.raised_local != req.body.raised_local) {
+              Knex('entry_distance')
+                .where({entry_id: req.params.entry_id, distance_ref: 'TOTAL_COMPETITION'})
+                .transacting(trx)
+                .then(distances => {
+                  net = distances[0].distance_m - (charge.m_per_local * req.body.raised_local)
+                  return Knex('entry_distance')
+                    .where({entry_id: req.params.entry_id, distance_ref: 'NET'})
+                    .delete()
+                    .transacting(trx)
+                })
+                .then(() => {
+                  if (entry.result_status == 'COMPLETE') {
+                    return Knex('entry_distance')
+                      .insert({entry_id: req.params.entry_id, distance_ref: 'NET', distance_m: Math.floor(net)})
+                      .transacting(trx)
+                  }
+                })
+                .then(() => {
+                  resolve()
+                })
+                .catch(err => {
+                  reject(err)
+                })
+            } else {
+              resolve()
+            }
+          })
+    
+        })
+          */
+        .then(() => {
+          if (entry.dist_penalty_gauntlet != req.body.dist_penalty_gauntlet || entry.dist_penalty_nongauntlet != req.body.dist_penalty_nongauntlet || entry.raised_local != req.body.raised_local) {
+            return module.exports.doUpdateDistances(req, trx, req.params.entry_id)            
+          }    
+        })        
         .then(trx.commit)
         .catch(trx.rollback)
     })
-    .then(()=>{
-      return Knex('entry_category')
-        .where({entry_id: req.params.entry_id})
-        .delete()
-    })
-    .then(() => {
-      return Promise.all(req.body.category_ids.map(cat => {
-        return Knex('entry_category')
-          .insert({entry_id: req.params.entry_id, category_id: cat})
-       }))
-    })    
     .then(() => {
       res.send({'update': 'ok'})
     })
@@ -437,12 +538,6 @@ module.exports = {
         res.status(500).send({ error: 'an error has occured importing the raw gps data: ' + err })
       })
 
-  },
-
-  offsetGps (req, res) {
-    //Delete everything except the raw data
-
-    //Offset the raw data
   },
 
   clearResult(req, res) {

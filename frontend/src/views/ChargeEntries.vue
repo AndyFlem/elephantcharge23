@@ -15,11 +15,16 @@
 
   watch(()=>props.charge, newVal => {
     console.log('chargeId', newVal)
-    axiosPlain.get('/charge/' + newVal.charge_id + '/entries')
+    reloadEntries()
+  }, { immediate: true })
+
+  function reloadEntries() {
+    state.entries = null
+    axiosPlain.get('/charge/' + props.charge.charge_id + '/entries')
         .then(rows => {
           state.entries = rows.data
-        })    
-  }, { immediate: true })
+        })
+  }
   
   const sortStatus = (value) => {
     if (value.result_status) {
@@ -48,8 +53,8 @@
     {key: 'distance_net', formatter: format.distance}  
   ]
 
-  function entryCreated(entry) {
-    state.entries.push(entry)
+  function entryCreated() {
+    reloadEntries()
   }
   function deleteEntry(entry) {
     axiosPlain.delete(`/entry/${entry.entry_id}`)
@@ -58,9 +63,8 @@
       })
       .catch(err => {alert('error', 'Error', JSON.stringify(err.message))})
   }
-  function entryUpdated(entry) {
-    if (entry.raised_local) {entry.raised_dollars = entry.raised_local/props.charge.exchange_rate}
-    state.entries[state.entries.map(v=>v.entry_id).indexOf(entry.entry_id)] = entry
+  function entryUpdated() {
+    reloadEntries()
   }
 
 </script>
@@ -72,13 +76,12 @@
         v-if="state.entries"
         :headers="entryTableHeaders"
         :items="state.entries"
+        :sort-by="[{key: 'car_no', order: 'asc'}]"
         item-value="name"
         items-per-page="-1"
         class="elevation-1"
         density="compact"
-        :custom-key-sort="{
-          'status': (a,b) => sortStatus(a)-sortStatus(b),
-          }"
+        :custom-key-sort="{'status': (a,b) => sortStatus(a)-sortStatus(b)}"
       >
         <template 
           v-for="heder in formatters" 
@@ -105,7 +108,7 @@
             </template>
           </EntryForm>
           <v-btn title="Delete entry" v-if="item.processing_status == 'NO_GPS'" size="x-small" variant="flat" @click="deleteEntry(item)" icon="mdi-delete"></v-btn>
-        </template>    
+        </template> 
         <template #bottom>
           <v-row class="mt-2 mb-2 mr-2">
             <v-col cols="12" class="d-flex">

@@ -103,8 +103,8 @@
           >
               {{ heder.hasOwnProperty('formatter') ? heder.formatter(value) : value}}
           </template>          
-          <template v-slot:item.color="{ value }">
-            <v-chip variant="elevated" :color="value">&nbsp;&nbsp;</v-chip>
+          <template v-slot:item.color="{ value, index }">
+            <v-chip variant="elevated" :color="value">{{index+1}}</v-chip>
           </template>
             <template v-slot:item.actions="{ item }">
               <TeamForm :team-id="item.team_id" @team-updated="teamUpdated">

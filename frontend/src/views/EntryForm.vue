@@ -74,10 +74,8 @@
       state.entry.class_id = state.selectedClass.class_id
       state.entry.class_name = state.selectedClass.class_name
     }
-    if (state.selectedCategories.length>0) {
-      state.entry.category_ids = state.selectedCategories.map(c => c.category_id)
-      state.entry.categories = state.selectedCategories.map(c => c.category).join(', ')
-    }
+    state.entry.category_ids = state.selectedCategories.map(c => c.category_id)
+    state.entry.categories = state.selectedCategories.map(c => c.category).join(', ')
 
     const { valid } = await form.value.validate()
 
@@ -85,15 +83,15 @@
       if (props.entryId) {
         axiosPlain.put(`/entry/${props.entryId}`, state.entry)
           .then(() => {
-            emit('entryUpdated', state.entry)
+            emit('entryUpdated', props.entryId)
             hide()
           })
       } else {
         axiosPlain.post('/entry', state.entry)
           .then(ret => {
-            state.entry.entry_id = ret.data.entry_id
-            state.entry.processing_status = 'NO_GPS'
-            emit('entryCreated', state.entry)
+            // state.entry.entry_id = ret.data.entry_id
+            // state.entry.processing_status = 'NO_GPS'
+            emit('entryCreated', ret.data.entry_id)
             hide()
           })
       }
@@ -282,17 +280,6 @@
                 variant="outlined"
               ></v-select>
             </v-col> 
-            <v-col cols="6" class="pt-4 pb-1">
-              <v-text-field
-                label="Amount Raised (local currency)"
-                density="compact"
-                v-model="state.entry.raised_local"
-                placeholder="100000"
-                variant="outlined"
-              ></v-text-field>
-            </v-col>                                                         
-          </v-row>
-          <v-row>
             <v-col cols="6"  class="pt-4 pb-1">
               <v-select
                 label="Teltonika Device IMEI" 
@@ -303,6 +290,26 @@
                 density="compact"
                 variant="outlined"
               ></v-select>
+            </v-col>            
+          </v-row>
+          <v-row>
+            <v-col cols="6" class="pt-4 pb-1">
+              <v-text-field
+                label="Amount Raised (local currency)"
+                density="compact"
+                v-model="state.entry.raised_local"
+                placeholder="100000"
+                variant="outlined"
+              ></v-text-field>
+            </v-col>                                                         
+            <v-col cols="6" class="pt-4 pb-1">
+              <v-text-field
+                label="Gauntlet penalties m"
+                density="compact"
+                v-model="state.entry.dist_penalty_gauntlet"
+                placeholder="100000"
+                variant="outlined"
+              ></v-text-field>
             </v-col>
           </v-row>
         </v-form>

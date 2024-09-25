@@ -88,21 +88,36 @@ module.exports = {
   distanceAwardResults(req, res) {
     Common.debug(req, 'distanceAwardResults')
 
-    let awards
+
+    let award
+    let results
 
     Knex.transaction(function (trx) {
-      return Knex('v_distanceawardresults')
-        .where({charge_id: req.params.charge_id, award_id: req.params.award_id})
-        .select()
-        .transacting(trx) 
+      return Knex('award')
+        .where({award_id: req.params.award_id})
+        .transacting(trx)
         .then(awds=>{
-          awards = awds
+          award = awds[0]
+
+          const qry = Knex('v_distanceawardresults')
+            .where({charge_id: req.params.charge_id, award_id: req.params.award_id})
+          
+          if (award.sort_result_status) {
+            qry.orderBy('leg_count', 'desc')
+          }
+          qry.orderBy('distance_m', 'asc')
+          return qry
+            .select()
+            .transacting(trx)
+        })
+        .then(rests=>{
+          results = rests
         })
         .then(trx.commit)
         .catch(trx.rollback)
       })
       .then(() => {
-        res.send(awards)
+        res.send(results)
       })
       .catch(err => {
         Common.error(req, 'distanceAwardResults', err)
@@ -211,6 +226,7 @@ module.exports = {
     Common.debug(req, 'createTsetse')
 
     let charge
+    let tsetse_no
 
     Knex.transaction(function (trx) {
       return ChargeCommon.getChargeById(req, trx, req.params.charge_id)
@@ -218,12 +234,17 @@ module.exports = {
           charge = chge
           let qry = Knex('charge')
             .where({charge_id: charge.charge_id})
-    
+          
+          console.log('tsl1', charge.tsetse1_leg_id)
+          console.log('tsl2', charge.tsetse2_leg_id)
+
           if (!charge.tsetse1_leg_id) {
             qry.update({tsetse1_leg_id: req.body.leg_id})
+            tsetse_no = 1
           } else {
             if (!charge.tsetse2_leg_id) {
               qry.update({tsetse2_leg_id: req.body.leg_id})
+              tsetse_no = 2
             }  
           }
           
@@ -235,6 +256,21 @@ module.exports = {
             .update({is_tsetse: true})
             .where({leg_id: req.body.leg_id})
             .transacting(trx)
+        })
+        .then(() => {
+          return Knex('entry_leg')
+            .where({leg_id: req.body.leg_id})
+
+            .select(['entry_id', 'leg_id', 'distance_m'])
+            .transacting(trx)
+        })
+        .then(eLegs => {
+          return Promise.all(eLegs.map(eLeg=>{
+            console.log('Create ', eLeg, tsetse_no)
+            return Knex('entry_distance')
+              .insert({entry_id: eLeg.entry_id, distance_ref: 'TSETSE_' + tsetse_no, distance_m: eLeg.distance_m})
+              .transacting(trx)
+          }))
         })
         .then(trx.commit)
         .catch(trx.rollback)
@@ -251,6 +287,7 @@ module.exports = {
     Common.debug(req, 'deleteTsetse')
     
     let charge
+    let tsetse_no
 
     Knex.transaction(function (trx) {
       return ChargeCommon.getChargeById(req, trx, req.params.charge_id)
@@ -261,9 +298,11 @@ module.exports = {
     
           if (charge.tsetse1_leg_id == req.params.leg_id) {
             qry.update({tsetse1_leg_id: null})
+            tsetse_no = 1
           } 
-          if (!charge.tsetse2_leg_id == req.params.leg_id) {
+          if (charge.tsetse2_leg_id == req.params.leg_id) {
             qry.update({tsetse2_leg_id: null})
+            tsetse_no = 2
           }
           
           return qry
@@ -275,6 +314,21 @@ module.exports = {
             .where({leg_id: req.params.leg_id})
             .transacting(trx)
         })
+        .then(() => {
+          return Knex('entry_leg')
+            .where({leg_id: req.params.leg_id})
+            .select(['entry_id', 'leg_id'])
+            .transacting(trx)
+        })
+        .then(eLegs => {
+          return Promise.all(eLegs.map(eLeg=>{
+            console.log('Delete eLeg', eLeg, tsetse_no)
+            return Knex('entry_distance')
+              .where({entry_id: eLeg.entry_id, distance_ref: 'TSETSE_' + tsetse_no})
+              .delete()
+              .transacting(trx)
+          }))
+        })        
         .then(trx.commit)
         .catch(trx.rollback)
     })

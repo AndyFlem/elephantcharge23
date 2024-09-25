@@ -8,6 +8,8 @@
   import EntryCheckins from './EntryCheckins.vue'
   import EntryLegs from './EntryLegs.vue'
   import MapPanel from './MapPanel.vue'
+  import EntryResults from './EntryResults.vue'
+  import EntryForm from './EntryForm.vue'
 
   const axiosPlain = inject('axiosPlain')
   const format = inject('format')
@@ -16,6 +18,9 @@
 
   const showGPSDataForm = ref(false)
   const showYellowCard = ref(false)
+
+  const entryFormShow = ref(false)
+
 
   const state = reactive({
     entryId: null,
@@ -91,6 +96,7 @@
 </script>
 
 <template>
+  <EntryForm v-if="state.charge && state.entry" :charge-id="state.charge.charge_id" :entry-id="state.entry.entry_id" :dialog="entryFormShow" @entry-updated="entryUpdated"/>
   <EntryGPSData :dialog="showGPSDataForm" :charge="state.charge" :entry="state.entry" @closed="showGPSDataForm=false" @entry-gps-updated="entryGPSUpdated" />
   <EntryCheckpointCard :dialog="showYellowCard" :charge="state.charge" :entry="state.entry" @closed="showYellowCard=false" @checkpopint-card-updated="checkpopintCardUpdated"/>
   <v-container fluid>
@@ -103,13 +109,13 @@
     <v-row>
       <v-col class="pb-0" cols="12">
         <v-card v-if="state.charge" elevation="0" border rounded>
-            <v-card-title class="d-flex pb-0">
-              <span class="text-h4"><router-link style="text-decoration: none;" :to="{name: 'Charge', params: {charge_id: state.charge.charge_ref }}">{{ state.charge.charge_name }}</router-link></span>
-              <v-spacer/>
-            </v-card-title>
-            <v-card-text class="pt-1 pb-1">
-              {{ DateTime.fromISO(state.charge.charge_date).toFormat('ccc d LLL y') }} {{ DateTime.fromISO(state.charge.start_time).toFormat('HH:mm') }}-{{ DateTime.fromISO(state.charge.end_time).toFormat('HH:mm') }}, <i>{{ state.charge.location }}.</i>
-            </v-card-text>
+          <v-card-title class="d-flex pb-0">
+            <span class="text-h4"><router-link style="text-decoration: none;" :to="{name: 'Charge', params: {charge_id: state.charge.charge_ref }}">{{ state.charge.charge_name }}</router-link></span>
+            <v-spacer/>
+          </v-card-title>
+          <v-card-text class="pt-1 pb-1">
+            {{ DateTime.fromISO(state.charge.charge_date).toFormat('ccc d LLL y') }} {{ DateTime.fromISO(state.charge.start_time).toFormat('HH:mm') }}-{{ DateTime.fromISO(state.charge.end_time).toFormat('HH:mm') }}, <i>{{ state.charge.location }}.</i>
+          </v-card-text>
         </v-card>
       </v-col>
       <v-col class="pt-1 pb-1" cols="12">
@@ -125,16 +131,19 @@
                 </template>
                 <v-list density="compact">
                   <v-list-item v-if="state.entry && state.charge">
+                    <v-btn prepend-icon="mdi-pencil" @click="entryFormShow=true" density="compact" variant="text">Edit Entry</v-btn>
+                  </v-list-item>
+                  <v-list-item v-if="state.entry && state.charge">
                     <v-btn prepend-icon="mdi-map-marker" @click="showGPSDataForm=true" density="compact" variant="text">GPS Data</v-btn>
                   </v-list-item>
                   <v-list-item v-if="state.entry && state.charge">
                       <v-btn prepend-icon="mdi-file-document" @click="showYellowCard=true" density="compact" variant="text">Yellow Card</v-btn>
                   </v-list-item>
                   <v-list-item v-if="state.entry && state.charge">
-                      <v-btn prepend-icon="" @click="processLegs" density="compact" variant="text">Process Legs</v-btn>
+                      <v-btn prepend-icon="mdi-call-split" @click="processLegs" density="compact" variant="text">Process Legs</v-btn>
                   </v-list-item>
                   <v-list-item v-if="state.entry && state.charge">
-                      <v-btn prepend-icon="" @click="clearResult" density="compact" variant="text">Clear Result</v-btn>
+                      <v-btn prepend-icon="mdi-cancel" @click="clearResult" density="compact" variant="text">Clear Result</v-btn>
                   </v-list-item>                  
                 </v-list>
               </v-menu>              
@@ -149,8 +158,11 @@
     </v-row>
     <v-row>
       <v-col cols="12" sm="4">
-      <MapPanel v-if="state.entry && state.charge" :charge="state.charge" :entry="state.entry"/>
-    </v-col>
+        <MapPanel v-if="state.entry && state.charge" :charge="state.charge" :entry="state.entry"/>
+      </v-col>
+      <v-col cols="12" sm="4">
+        <EntryResults v-if="state.entry && state.charge" :charge="state.charge" :entry="state.entry"/>
+      </v-col>
     </v-row>
   </v-container>
 </template>
