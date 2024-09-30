@@ -40,19 +40,23 @@
 </script>
 
 <template>
-    <v-card>
+    <v-row>
+      <v-col cols="12" sm="6" md="4">
+        <v-card v-if="state.distances && entry.processing_status=='LEGS'">
         <v-card-text>
-          <table v-if="state.distances" class="table">
-
-            <tr><td>Charge: {{ format.distance(state.distances.TOTAL.distance_m) }}</td></tr>
-            <tr><td>Competition: {{ format.distance(state.distances.TOTAL_COMPETITION.distance_m) }}</td></tr>
-            <tr><td>Net: {{ format.distance(state.distances.NET.distance_m) }}</td></tr>
+          <table class="table">
+            <tr><td>Actual Distance: {{ format.distance(state.distances.TOTAL.distance_m) }}</td></tr>
+            <tr><td>Competition Distance: {{ format.distance(state.distances.TOTAL_COMPETITION.distance_m) }}</td></tr>
+            <tr><td>Net Distance: {{ state.distances.NET ? format.distance(state.distances.NET.distance_m) : 'na'}}</td></tr>
             <tr><td></td></tr>
-            <tr><td>Gauntlet: {{ format.distance(state.distances.GAUNTLET.distance_m) }}</td></tr>
-            <tr><td>Gauntlet penalties: {{ state.distances.GAUNTLET_PENALTIES ? format.distance(state.distances.GAUNTLET_PENALTIES.distance_m):'-' }}</td></tr>
-            <tr><td>Gauntlet competition: {{ format.distance(state.distances.GAUNTLET_COMPETITION.distance_m) }}</td></tr>
+            <tr v-if="state.distances.GAUNTLET"><td>Gauntlet Actual Distance: {{ format.distance(state.distances.GAUNTLET.distance_m) }}</td></tr>
+            <tr v-if="state.distances.GAUNTLET_PENALTIES"><td>Gauntlet penalties: {{  format.distance(state.distances.GAUNTLET_PENALTIES.distance_m) }}</td></tr>
+            <tr v-if="state.distances.GAUNTLET_COMPETITION"><td>Gauntlet Competition Distance: {{ format.distance(state.distances.GAUNTLET_COMPETITION.distance_m) }}</td></tr>
           </table>
         </v-card-text>
     </v-card>
+      </v-col>
+    </v-row>
+
   
 </template>

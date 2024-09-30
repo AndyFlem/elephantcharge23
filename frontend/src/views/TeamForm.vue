@@ -99,7 +99,7 @@
                 label="Captain"
                 density="compact"
                 v-model="state.team.captain"
-                placeholder="Coke"
+                placeholder="Joe Bloggs"
                 variant="outlined"
               ></v-text-field>
             </v-col>

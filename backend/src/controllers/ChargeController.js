@@ -124,7 +124,88 @@ module.exports = {
         res.status(500).send({ error: 'an error has occured getting the distance award results: ' + err })
       })
   },
+  pledgeAwardResults(req, res) {
+    Common.debug(req, 'pledgeAwardResults')
 
+
+    let award
+    let results
+
+    Knex.transaction(function (trx) {
+      return Knex('award')
+        .where({award_id: req.params.award_id})
+        .transacting(trx)
+        .then(awds=>{
+          award = awds[0]
+
+          const qry = Knex('v_pledgeawardresults')
+            .where({charge_id: req.params.charge_id, award_id: req.params.award_id})
+            .whereNotNull('raised_dollars')
+          
+          qry.orderBy('raised_dollars', 'desc')
+          return qry
+            .select()
+            .transacting(trx)
+        })
+        .then(rests=>{
+          results = rests
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+      })
+      .then(() => {
+        res.send(results)
+      })
+      .catch(err => {
+        Common.error(req, 'pledgeAwardResults', err)
+        res.status(500).send({ error: 'an error has occured getting the pledge award results: ' + err })
+      })
+  },
+  awardResults(req, res) {
+    Common.debug(req, 'awardResults')
+
+    let awards
+    let results=[]
+
+    Knex.transaction(function (trx) {
+      return Knex('v_award')
+        .orderBy('ordinal')
+        .transacting(trx)
+        .then(awds=>{
+          awards = awds
+
+          return Promise.all(awards.map(award=>{
+            const qry = Knex(award.type_ref=='DISTANCE' ? 'v_distanceawardresults' : 'v_pledgeawardresults')
+              .where({charge_id: req.params.charge_id, award_id: award.award_id})
+          
+            if (award.sort_result_status) {
+              qry.orderBy('leg_count', 'desc')
+            }
+            if (award.type_ref=='DISTANCE') {
+              qry.orderBy('distance_m', 'asc')
+            } else {
+              qry.orderBy('raised_dollars', 'desc')
+            }
+            return qry
+              .select()
+              .transacting(trx)
+              .then(rests=>{
+                award.results = rests.slice(0,3)
+                results.push(award)
+              }) 
+          }))
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+      })    
+    .then(() => {
+      res.send(results)
+    })
+    .catch(err => {
+      Common.error(req, 'awardResults', err)
+      res.status(500).send({ error: 'an error has occured getting the award results: ' + err })
+    })
+  },
   legs(req, res) {
     Common.debug(req, 'legs')
 

@@ -58,6 +58,7 @@
     {title: 'Registration', align: 'start', sortable: true, key: 'registration'},
     {title: 'Teams', align: 'start', sortable: true, key: 'team_count'},
     {title: 'Entries', align: 'start', sortable: true, key: 'entry_count'},
+    {title: 'Last Charge', align: 'start', sortable: true, key: 'last_charge'},
     {title: 'Actions', align: 'middle', sortable: false, key: 'actions'},
   ]
 

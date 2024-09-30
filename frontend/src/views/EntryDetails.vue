@@ -160,7 +160,7 @@
       <v-col cols="12" sm="4">
         <MapPanel v-if="state.entry && state.charge" :charge="state.charge" :entry="state.entry"/>
       </v-col>
-      <v-col cols="12" sm="4">
+      <v-col cols="12" sm="8">
         <EntryResults v-if="state.entry && state.charge" :charge="state.charge" :entry="state.entry"/>
       </v-col>
     </v-row>

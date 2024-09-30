@@ -33,6 +33,7 @@
   }
   
   const entryTableHeaders = [
+    {title: '', align: 'start', sortable: true, key: 'no'},
     {title: 'No', align: 'start', sortable: true, key: 'car_no'},
     {title: 'Team', align: 'start', sortable: true, key: 'entry_name'},
     {title: 'Class', align: 'start', sortable: true, key: 'class_name'},
@@ -98,6 +99,9 @@
             {{ format.entryStatusDescription(item) }}
           </v-chip>            
         </template>
+        <template v-slot:item.no="{ index }">
+          {{  index+1  }}
+        </template> 
         <template v-slot:item.car_no="{ item }">
           <v-chip variant="elevated" style="min-width: 40px;" :color="item.color">{{ item.car_no }}</v-chip>
         </template>        

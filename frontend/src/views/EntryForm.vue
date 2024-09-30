@@ -242,6 +242,7 @@
               <v-select
                 label="Class"
                 :items="state.classes"
+                v-if="state.classes"
                 item-title="class_name"
                 :return-object="true"
                 v-model="state.selectedClass"
@@ -271,6 +272,7 @@
             <v-col cols="6"  class="pt-4 pb-1">
               <v-select
                 label="Categories"
+                v-if="state.categories"
                 :items="state.categories"
                 item-title="category"
                 multiple
@@ -282,6 +284,7 @@
             </v-col> 
             <v-col cols="6"  class="pt-4 pb-1">
               <v-select
+                v-if="state.imeis"
                 label="Teltonika Device IMEI" 
                 :items="state.imeis"
                 item-title="imei"

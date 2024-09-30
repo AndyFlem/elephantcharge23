@@ -39,6 +39,7 @@ module.exports = {
     Knex('v_entry')
       .where({charge_id: req.params.charge_id})
       .select()
+      .orderBy('car_no')
       .then(entries => res.send(entries))
       .catch(err => {
         Common.error(req, 'index', err)
@@ -85,8 +86,23 @@ module.exports = {
 
     return Knex('v_entry')
       .where({charge_id: chargeId})
+      .orderBy('car_no')
       .select()
       .transacting(trx)
+  },
+  indexForLeg (req, res) {
+    Common.debug(req, 'indexForLeg')
+
+    Knex('v_entry')
+      .join('v_entry_leg', 'v_entry.entry_id', 'v_entry_leg.entry_id')
+      .where({leg_id: req.params.leg_id})
+      .orderBy('v_entry_leg.leg_position')
+      .select()
+      .then(entries => res.send(entries))
+      .catch(err => {
+        Common.error(req, 'indexForLeg', err)
+        res.status(500).send({ error: 'an error has occured getting the entries: ' + err })
+      })
   },
   indexClasses (req, res) {
     Common.debug(req, 'indexClasses')
@@ -134,14 +150,55 @@ module.exports = {
       res.status(500).send({ error: 'An error has occured trying fetch the legs for the entry: ' + err })
     })
   },
+  kml(req, res) {
+    Common.debug(req, 'kml')
+
+    const kml = require('../services/kml')
+    let kmlString
+
+    Knex.transaction(function (trx) {
+      return kml.entryKml(req, trx, req.params.entry_id)  
+        .then(kmlStr => {
+          kmlString = kmlStr
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(() => {
+      res.send(kmlString)
+    })
+    .catch(err => {
+      Common.error(req, 'kml', err)
+      res.status(500).send({ error: 'An error has occured trying fetch the kml for the entry: ' + err })
+    })
+  },  
   doGetLegs (req, trx, entryId) {
     Common.debug(req, 'doGetLegs')
-
-    return Knex('v_entry_leg')
-      .where({entry_id: entryId})
-      .orderBy('leg_no')
+    
+    let qry
+    if (req.query.geometry=='geojson') {
+      qry = Knex.raw(`SELECT vel.*, st_asgeojson(entry_leg.leg_line) AS leg_line
+        FROM v_entry_leg vel INNER JOIN entry_leg ON vel.entry_leg_id = entry_leg.entry_leg_id
+        WHERE vel.entry_id = ? ORDER BY vel.leg_no`, [entryId])
+    } else {
+      if (req.query.geometry=='kml') {
+        qry = Knex.raw(`SELECT vel.*, st_askml(entry_leg.leg_line) AS leg_line
+          FROM v_entry_leg vel INNER JOIN entry_leg ON vel.entry_leg_id = entry_leg.entry_leg_id
+          WHERE vel.entry_id = ? ORDER BY vel.leg_no`, [entryId])  
+      } else {
+        qry = Knex.raw(`SELECT vel.*
+          FROM v_entry_leg vel 
+          WHERE vel.entry_id = ? ORDER BY vel.leg_no`, [entryId])
+      }
+     }
+    return qry
       .transacting(trx)
-      .select()
+      .then(dat=>{
+        return dat.rows
+      })
+      .catch(err=>{
+        Common.debug(null, 'doGetLegs', 'ERROR: ' + err)
+      })
   },
   checkins(req, res) {
     Common.debug(req, 'checkins')

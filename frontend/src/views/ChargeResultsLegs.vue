@@ -4,17 +4,15 @@
   import { DateTime } from 'luxon'
   const format = inject('format')
 
+  import ChargeResultsLeg from './ChargeResultsLeg.vue';
 
-  import ChargeResultsAward from './ChargeResultsAward.vue';
-  
   const axiosPlain = inject('axiosPlain')
   const route = useRoute()
 
   const state = reactive({
     chargeId: null,
     charge: null,
-    awards: null,
-    awardResults: null
+    legs: null,
   })
   
   watch(
@@ -24,16 +22,11 @@
       axiosPlain.get('/charge/' + chargeId)
           .then(rows => {
             state.charge = rows.data
-            return axiosPlain.get('/awards')
+            return axiosPlain.get('/charge/'+ chargeId + '/legs')
           })
           .then(rows => {
-            state.awards = rows.data
-            return axiosPlain.get('/charge/'+ chargeId + '/award_results')
+            state.legs = rows.data
           })
-          .then(rows => {
-            state.awardResults = rows.data
-          })
-
     }, { immediate: true }
   )
 
@@ -56,33 +49,10 @@
         </v-card>
       </v-col>
     </v-row>
-    <v-row v-if="state.awardResults">
-      <v-col cols="12">
-        <v-card>
-          <v-table class="mx-4 my-5">
-            <tbody>
-          <template :key="award.award_id" v-for="award in state.awardResults">
-            <tr v-if="award.results.length>0">
-              <td style=""><b>{{ award.name }}</b></td>              
-              <td>{{ award.results[0].car_no }} {{ award.results[0].entry_name }}</td>
-            </tr>
-          </template>
-        </tbody>
-        </v-table>
-        </v-card>
+    <v-row v-if="state.legs">
+      <v-col :key="leg.leg_id" v-for="leg in state.legs" cols="12">
+        <charge-results-leg :charge="state.charge" :leg="leg" />
       </v-col>
     </v-row>
-    <template v-if="state.awards">
-      <v-row :key="award.award_id" v-for="award in state.awards">
-        <v-col>
-          <v-card>
-            <v-card-title>{{ award.name }}</v-card-title>
-            <v-card-text>
-              <charge-results-award :charge="state.charge" :award="award" />
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-    </template>
   </v-container>
 </template>

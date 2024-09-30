@@ -210,7 +210,7 @@
 
     checkpointPoints.setSource(
       new VectorSource({
-        features: new GeoJSON().readFeatures(checkpointMarkers.value)
+        features: new GeoJSON().readFeatures(checkpointMarkers.value, {dataProjection: 'EPSG:4326', featureProjection: 'EPSG:3857'})
       })
     )
     map.addLayer(checkpointPoints)

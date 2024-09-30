@@ -1,4 +1,5 @@
 import { format } from 'd3'
+import { Duration } from 'luxon'
 import { DateTime } from 'luxon'
 
 export default {
@@ -53,7 +54,7 @@ export default {
         return format(',.0f')(value)
       },      
       multiple: (value) => {
-        return format('.1f')(value) + 'x'
+        return format('.1f')(value<1?1:value) + 'x'
       },
       proportion: (value) => {
         return format(',.0%')(value)
@@ -68,7 +69,8 @@ export default {
         return DateTime.fromISO(value).toFormat('ccc dd LLL yyyy HH:mm')
       },
       secs: (value) => {
-        return format('.0f')(value) + ' mins'
+        let dur = Duration.fromObject({ seconds: value })
+        return dur.toFormat('hh:mm:ss')
       },
       speed: (value) => {
         return format('.2r')(value) + ' km/h'

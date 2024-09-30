@@ -66,8 +66,18 @@
                       <v-btn prepend-icon="mdi-delete" density="compact" variant="text" @click="deleteCharge">Delete charge</v-btn>
                   </v-list-item>
                   <v-list-item>
-                      <v-btn prepend-icon="mdi-book" density="compact" variant="text" @click="router.push({ name: 'Charge Results', params: { charge_id: state.charge.charge_id } })">Results</v-btn>
-                  </v-list-item>                  
+                      <v-btn prepend-icon="mdi-book" density="compact" variant="text" @click="router.push({ name: 'Charge Entries', params: { charge_id: state.charge.charge_id } })">Entries</v-btn>
+                  </v-list-item>                     
+                  <v-list-item>
+                    <a :href="`/charge/${state.charge.charge_id}/results`">Charge Results</a>
+                  </v-list-item>  
+                  <v-list-item>
+                    <a :href="`/charge/${state.charge.charge_id}/entries_results`">Charge Entry Results</a>
+                  </v-list-item>  
+                  <v-list-item>
+                    <a :href="`/charge/${state.charge.charge_id}/legs_results`">Charge Leg Results</a>
+                  </v-list-item>                                 
+
                 </v-list>
               </v-menu>              
             </v-card-title>

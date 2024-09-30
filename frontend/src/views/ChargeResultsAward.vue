@@ -13,10 +13,18 @@
     entries: null
   })
 
-  axiosPlain.get(`/charge/${props.charge.charge_id}/distance_results/${props.award.award_id}`)
+  if (props.award.type_ref=='DISTANCE') {
+    axiosPlain.get(`/charge/${props.charge.charge_id}/distance_results/${props.award.award_id}`)
     .then(rows => {
       state.entries = rows.data
     })
+  } else {
+    axiosPlain.get(`/charge/${props.charge.charge_id}/pledge_results/${props.award.award_id}`)
+    .then(rows => {
+      state.entries = rows.data
+    })
+  }
+
 
 const resultTableHeaders = [
     {title: 'No', align: 'start', sortable: true, key: 'index'},
@@ -54,7 +62,7 @@ const resultTableHeaders = [
       {{ heder.formatter(value) }}
     </template>
     <template v-slot:[`item.entry_name`]="{ item }">
-      <router-link :to="{name: 'Entry', params: {entry_id: item.entry_id }}">{{ item.entry_name }}</router-link>
+      {{ item.entry_name }}
     </template> 
 
     <template v-slot:[`item.status`]="{ item }">

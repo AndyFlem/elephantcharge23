@@ -74,7 +74,7 @@
       }
       if(props.entry.processing_status=='LEGS') {
         fnc.push(
-          axiosPlain.get('/entry/' + props.entry.entry_id + '/legs?from=map')
+          axiosPlain.get('/entry/' + props.entry.entry_id + '/legs?geometry=geojson')
             .then(rows => {
               state.entry.legs = rows.data
             })
