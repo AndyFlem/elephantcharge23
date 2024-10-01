@@ -38,5 +38,18 @@ export default {
     })  
 
     app.provide('axiosUpload', axiosUpload)    
+
+
+    const axiosStatic = axios.create({
+      baseURL: options.baseUrlStatic,
+      withCredentials: false,
+      timeout: 10000,
+      headers: { 'Content-Type': 'application/json' }
+    })
+    axiosStatic.interceptors.request.use(request => {
+      console.log('Axios request: ' + request.method + ':' + request.url)
+      return request
+    })  
+    app.provide('axiosStatic', axiosStatic)    
   }
 }

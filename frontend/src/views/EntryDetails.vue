@@ -12,6 +12,8 @@
   import EntryForm from './EntryForm.vue'
 
   const axiosPlain = inject('axiosPlain')
+  const axiosStatic = inject('axiosStatic')
+
   const format = inject('format')
 
   const route = useRoute()
@@ -27,6 +29,7 @@
     entry: null,
     charge: null,
   })
+
 
   const alerts = reactive({
     visible:false,
@@ -93,6 +96,26 @@
       })
       .catch(err =>{ alert('error','Error clearing the result', JSON.stringify(err)) })   
   }
+
+  function generateKml() {
+    return axiosPlain.get('/entry/' + state.entry.entry_id + '/kml')
+      .then((kml) => {
+        state.entry.kml = kml
+      })
+      .catch(err =>{ console.log('error','Error getting the kml', JSON.stringify(err)) })   
+  }
+
+  function downloadItem( url, label ) {
+    axiosStatic.get(url, { responseType: 'blob' })
+      .then(response => {
+        const blob = new Blob([response.data], { type: 'application/kml' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = label
+        link.click()
+        URL.revokeObjectURL(link.href)
+      }).catch(console.error)
+  }  
 </script>
 
 <template>
@@ -145,6 +168,12 @@
                   <v-list-item v-if="state.entry && state.charge">
                       <v-btn prepend-icon="mdi-cancel" @click="clearResult" density="compact" variant="text">Clear Result</v-btn>
                   </v-list-item>                  
+                  <v-list-item v-if="state.entry && state.charge && state.entry.kml">
+                      <v-btn prepend-icon="mdi-earth" @click="downloadItem(`/charges/kml/${state.entry.kml}`,`${state.entry.kml}`)" density="compact" variant="text">Download Kml</v-btn>
+                  </v-list-item>
+                  <v-list-item v-if="state.entry && state.charge && !state.entry.kml && state.entry.processing_status=='LEGS'">
+                      <v-btn prepend-icon="mdi-earth" @click="generateKml" density="compact" variant="text">Generate Kml</v-btn>
+                  </v-list-item>                                  
                 </v-list>
               </v-menu>              
             </v-col>

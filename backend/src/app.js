@@ -13,20 +13,20 @@ const path = require('path')
 const fileUpload = require("express-fileupload")
 
 const corsOptions = {
-  //origin: config.cors_origin,
-  credentials: true,
+  origin: config.cors_origin,
   optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
 }
 
 debug('Starting ec23 api server.')
 
-app.set('trust proxy', true)
+//app.set('trust proxy', true)
 app.use(bodyParser.json())
 app.use(fileUpload())
 app.use(cors(corsOptions))
-app.options('*', cors())
+//app.options('*', cors())
 
-app.use('/static', express.static(path.join(__dirname, '/../static')))
+//app.use('/static', cors(corsOptions), express.static(path.join(__dirname, '/../static')))
+app.use(express.static('public'))
 
 app.use((req, res, next) => {
   if (req.query.source) {

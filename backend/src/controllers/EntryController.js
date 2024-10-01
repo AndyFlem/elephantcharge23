@@ -5,6 +5,7 @@ const Common = require('./CommonDebug')('Entry')
 const ChargeCommon = require('./ChargeCommon')
 const GeotabController = require('./GeotabController')
 const GPSCommon = require('./GPSCommon')
+const fs = require('fs')
 
 //NO_GPS
 //CLEAN
@@ -154,6 +155,8 @@ module.exports = {
     Common.debug(req, 'kml')
 
     const kml = require('../services/kml')
+    const fs = require('fs');
+    const path = require('path');
     let kmlString
 
     Knex.transaction(function (trx) {
@@ -380,40 +383,6 @@ module.exports = {
               .transacting(trx)
           }))
         })
-        /*
-        .then(() => {
-          return new Promise((resolve, reject) => {
-            if (entry.raised_local != req.body.raised_local) {
-              Knex('entry_distance')
-                .where({entry_id: req.params.entry_id, distance_ref: 'TOTAL_COMPETITION'})
-                .transacting(trx)
-                .then(distances => {
-                  net = distances[0].distance_m - (charge.m_per_local * req.body.raised_local)
-                  return Knex('entry_distance')
-                    .where({entry_id: req.params.entry_id, distance_ref: 'NET'})
-                    .delete()
-                    .transacting(trx)
-                })
-                .then(() => {
-                  if (entry.result_status == 'COMPLETE') {
-                    return Knex('entry_distance')
-                      .insert({entry_id: req.params.entry_id, distance_ref: 'NET', distance_m: Math.floor(net)})
-                      .transacting(trx)
-                  }
-                })
-                .then(() => {
-                  resolve()
-                })
-                .catch(err => {
-                  reject(err)
-                })
-            } else {
-              resolve()
-            }
-          })
-    
-        })
-          */
         .then(() => {
           if (entry.dist_penalty_gauntlet != req.body.dist_penalty_gauntlet || entry.dist_penalty_nongauntlet != req.body.dist_penalty_nongauntlet || entry.raised_local != req.body.raised_local) {
             return module.exports.doUpdateDistances(req, trx, req.params.entry_id)            
@@ -705,6 +674,17 @@ module.exports = {
       .transacting(trx)
       .then(ents => {
         entry = ents[0]
+        // if file exists on disk, delete it
+        if (fs.existsSync('./../frontend/public/charges/kml/' + entry.kml)) {
+          fs.unlinkSync('./../frontend/public/charges/kml/' + entry.kml)
+        }
+
+        return Knex('entry')
+          .update({kml: null})
+          .where({entry_id: entryId})
+          .transacting(trx)
+      })
+      .then(() => {
         return Knex('gps_clean')
           .update({entry_leg_id: null})
           .where({entry_id: entryId})
@@ -1053,14 +1033,14 @@ module.exports = {
             if (msgs.length==0) {
               doAddLegs(req, trx, entry, checkpoints, legs)
                 .then(() => {
-                  return module.exports.doUpdateDistances(req, trx, entryId)
-                })
-                .then(() => {
                   oEntry.checkins_consistent = true    
                   oEntry.processing_status = 'LEGS'
                   oEntry.checkins_inconsistent_message = ''
                   oEntry.result_status = legs.length == charge.checkpoint_count?'COMPLETE':'DNF ' + legs.length
-                  console.log(oEntry)
+
+                  return module.exports.doUpdateDistances(req, trx, entryId)
+                })
+                .then(() => {
                   resolve(oEntry)
                 })
                 .catch(err => {
@@ -1080,6 +1060,10 @@ module.exports = {
             .update(ent)
             .where({entry_id: entryId})
             .transacting(trx)         
+        })
+        .then(()=>{
+          const kml = require('../services/kml')
+          return kml.entryKml(req, trx, entryId)
         })
         .then(trx.commit)
         .catch(trx.rollback)            

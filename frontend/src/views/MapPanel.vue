@@ -80,7 +80,10 @@
             })
         )
       } else {
-        state.entry.legs = null
+        if (state.entry) {
+          state.entry.legs = null
+        }
+         
       }
       Promise.all(fnc)
         .then(() => {

@@ -1,5 +1,6 @@
 const config = {
     port: 4001,
+    cors_origin: 'http://localhost:4000',
     development_mode: true,
     api_version: 'v1',
     local_crs: 3857,
