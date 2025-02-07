@@ -35,16 +35,16 @@ export default {
             return 'Checkpoints'
           case 'LEGS':
             return entry.result_status
-        }     
-      }, 
+        }
+      },
       distance: (value) => {
         if (!value) {
           return '-'
         } else {
           if (value<1000) {
-            return format(',.2r')(value/1000) + ' km'  
+            return format(',.2r')(value/1000) + ' km'
           }
-          return format(',.3r')(value/1000) + ' km'  
+          return format(',.3r')(value/1000) + ' km'
         }
       },
       currency: (value) => {
@@ -52,13 +52,13 @@ export default {
       },
       number: (value) => {
         return format(',.0f')(value)
-      },      
+      },
       multiple: (value) => {
         return format('.1f')(value<1?1:value) + 'x'
       },
       proportion: (value) => {
         return format(',.0%')(value)
-      },      
+      },
       time: (value) => {
         return DateTime.fromISO(value).toFormat('HH:mm')
       },

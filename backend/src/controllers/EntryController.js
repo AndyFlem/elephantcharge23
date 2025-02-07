@@ -1,4 +1,6 @@
 const Knex = require('../services/db')
+const TelKnex = require('../services/teltonika_db')
+
 const Luxon = require('luxon')
 const DateTime = Luxon.DateTime
 const Common = require('./CommonDebug')('Entry')
@@ -6,6 +8,9 @@ const ChargeCommon = require('./ChargeCommon')
 const GeotabController = require('./GeotabController')
 const GPSCommon = require('./GPSCommon')
 const fs = require('fs')
+const path = require('path')
+const config = require('../config/config')
+const TeltonikaController = require('./TeltonikaController')
 
 //NO_GPS
 //CLEAN
@@ -282,6 +287,225 @@ module.exports = {
   },
 
   // =======================
+  // IMPORTERS
+  // =======================
+
+  doImportTeltonikaDB (req, trx, entry_id, imei) {
+    Common.debug(null, 'doImportTeltonikaDB')
+
+    let entry
+    let charge
+    let raws
+    let count = 0
+
+    return module.exports.doClearResult(req, trx, entry_id)
+    .then(() => {
+      return module.exports.getEntry(req, trx, entry_id)
+    })
+    .then(ent => {
+      entry = ent
+
+      return Knex('v_charge')
+        .where({charge_id: entry.charge_id})
+        .transacting(trx)
+        .select()
+    })
+    .then(charges => {
+      charge = charges[0]
+      return TelKnex.raw('SELECT * FROM gps_raw WHERE imei=? AND gps_datetime::date = ? order by gps_datetime',[imei, charge.charge_date])
+    })
+    .then(dat => {
+      raws = dat.rows
+
+      return Promise.all(raws.map(row => {
+        return Knex.raw(`INSERT INTO gps_clean (entry_id, gps_timestamp, location, location_prj) 
+          VALUES (?, ?, ST_Point(?,?,4326), ST_Transform(ST_Point(?,?,4326),?) )
+          `,[entry_id, row.gps_datetime, row.lon, row.lat, row.lon, row.lat, 'EPSG:' + config.local_crs])
+          .transacting(trx)
+      }))
+    })
+    .then(() => {
+      return Knex.raw(`SELECT ec23_gpscleansupdatecalcs(${entry_id})`)
+        .transacting(trx)
+    })
+    .then(() => {
+      return Knex.raw(`SELECT ec23_gpscleanscreateline(${entry_id})`)
+        .transacting(trx)
+    })    
+    .then(() => {
+      //return {raw_count: 0, clean_count: , stop_count: 0}
+      if (raws.length > 0) {
+        return module.exports.doCalculateCheckins(req, trx, entry_id)
+      }
+    })
+    .then(() => {
+      return raws.length
+    })
+  },
+  importTeltonikaDB (req, res) {
+    Common.debug(req, 'importTeltonikaDB')
+
+    const entry_id = req.params.entry_id
+    const imei = req.body.imei
+
+    Knex.transaction(function (trx) {
+      return module.exports.doImportTeltonikaDB(req, trx, entry_id, imei)
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(count => {
+      res.send({ok: count})
+    })
+    .catch(err => {
+      Common.error(req, 'importTeltonikaDB', err)
+      res.status(500).send({ error: 'an error has occured importing the Teltonika DB data: ' + err })
+    })
+  },
+  importTeltonikaBin (req, res) {
+    Common.debug(req, 'importTeltonikaBin')
+
+    const entry_id = req.params.entry_id
+    const imei = req.body.imei
+    let counts
+
+    if (!req.files) {
+      return res.status(400).send("No files were uploaded.");
+    }
+
+    TeltonikaController.readBin(req, req.files.file.data)
+      .then(raws => {
+        return Promise.all(raws.map((row,i) => {
+          row.imei = imei
+          row.received = DateTime.now().toISO()
+          row.record_no = i
+          row.source='bin'
+          return new Promise((resolve, reject) => {
+            TelKnex('gps_raw')
+              .insert(row)
+              .then(resolve)
+              .catch(err=>{
+                console.log(`Could not insert record ${row.gps_datetime}`)
+                resolve()
+              })
+          })
+        }))
+      })
+      .then(()=>{
+        Knex.transaction(function (trx) {
+          return module.exports.doImportTeltonikaDB(req, trx, entry_id, imei)
+            .then(trx.commit)
+            .catch(trx.rollback)
+        })
+      })
+      .then(() => {
+        Common.debug(null, 'importTeltonikaBin', JSON.stringify(importCounts))
+        res.send( {ok: counts} )
+      })
+      .catch(err => {
+        Common.error(req, 'importTeltonikaBin', err)
+        res.status(500).send({ error: 'an error has occured importing the Teltonika Bin data: ' + err })
+      })
+
+  },
+  importGeotab (req, res) {
+    Common.debug(req, 'importGeotab')
+
+    const entry_id = req.params.entry_id
+    const device_id = req.body.device_id
+    const date = req.body.date
+    const offsetMinutes = req.body.offsetMinutes
+    let importCounts
+
+    Knex.transaction(function (trx) {
+      return module.exports.doClearResult(req, trx, entry_id)
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(() => {
+      return GeotabController.importRaw(req, entry_id, device_id, date, offsetMinutes)
+    })
+    .then(cnts => {
+      importCounts = cnts
+      if (importCounts.clean_count > 0) {
+        return Knex.transaction(function (trx) {
+          module.exports.doCalculateCheckins(req, trx, entry_id)
+            .then(trx.commit)
+            .catch(trx.rollback)
+        })
+      }
+    })
+    .then(() => {
+      Common.debug(null, 'importGeotab', JSON.stringify(importCounts))
+      res.send(importCounts)
+    })
+    .catch(err => {
+      Common.error(req, 'importGeotab', err)
+      res.status(500).send({ error: 'an error has occured importing the geotab raw gps data: ' + err })
+    })
+  },
+  importGpx (req, res) {
+    Common.debug(req, 'importGpx')
+
+    const entry_id = req.params.entry_id
+
+    let counts
+    let entry
+    let charge
+    let unfiltered 
+
+    if (!req.files) {
+      return res.status(400).send("No files were uploaded.");
+    }
+    
+    return Knex.transaction(function (trx) {
+      module.exports.getEntry(req, trx, entry_id)
+        .then(ent => {
+          entry = ent
+          return ChargeCommon.getChargeById(req, trx, entry.charge_id)
+        })
+        .then(chrg => {
+          charge = chrg
+          return module.exports.doClearResult(req, trx, entry_id)
+        })
+        .then(() => {
+          let gpx = req.files.file.data.toString('utf8')
+          unfiltered = extractGPX(gpx)
+          let rows = unfiltered.filter(v=>v.datetime.diff(DateTime.fromISO(charge.charge_date),'days').days<1)
+          return GPSCommon.importRaw(req, trx, entry_id, rows, 0, 0)
+        })
+        .then(cnts => {
+          counts = cnts
+
+          return Knex('entry')
+            .update({
+              processing_status: counts.clean_count > 0 ? 'CLEAN':'NO_GPS', 
+              gps_source_ref: counts.clean_count > 0 ? 'GPX' : null,
+              geotab_device_id: null
+            })
+            .where({entry_id: entry_id})
+            .transacting(trx)    
+        })
+        .then(() => {
+          if (counts.clean_count > 0 ) {
+            return module.exports.doCalculateCheckins(req, trx, entry_id)
+          }
+        })  
+        .then(trx.commit)
+        .catch(trx.rollback)
+      })
+      .then(() => {
+        Common.debug(null, 'importGpx', JSON.stringify(counts))
+        res.send(counts)
+      })
+      .catch(err => {
+        Common.error(req, 'importGpx', err)
+        res.status(500).send({ error: 'an error has occured importing the raw gps data: ' + err })
+      })
+
+  },
+
+
+  // =======================
   // WRITE
   // =======================
   create (req, res) {
@@ -469,103 +693,6 @@ module.exports = {
     })
   },
 
-  importGeotab (req, res) {
-    Common.debug(req, 'importGeotab')
-
-    const entry_id = req.params.entry_id
-    const device_id = req.body.device_id
-    const date = req.body.date
-    const offsetMinutes = req.body.offsetMinutes
-    let importCounts
-
-    Knex.transaction(function (trx) {
-      return module.exports.doClearResult(req, trx, entry_id)
-        .then(trx.commit)
-        .catch(trx.rollback)
-    })
-    .then(() => {
-      return GeotabController.importRaw(req, entry_id, device_id, date, offsetMinutes)
-    })
-    .then(cnts => {
-      importCounts = cnts
-      if (importCounts.clean_count > 0) {
-        return Knex.transaction(function (trx) {
-          module.exports.doCalculateCheckins(req, trx, entry_id)
-            .then(trx.commit)
-            .catch(trx.rollback)
-        })
-      }
-    })
-    .then(() => {
-      Common.debug(null, 'importGeotab', JSON.stringify(importCounts))
-      res.send(importCounts)
-    })
-    .catch(err => {
-      Common.error(req, 'importGeotab', err)
-      res.status(500).send({ error: 'an error has occured importing the geotab raw gps data: ' + err })
-    })
-  },
-  importGpx (req, res) {
-    Common.debug(req, 'importGpx')
-
-    const entry_id = req.params.entry_id
-
-    let counts
-    let entry
-    let charge
-    let unfiltered 
-
-    if (!req.files) {
-      return res.status(400).send("No files were uploaded.");
-    }
-    
-    return Knex.transaction(function (trx) {
-      module.exports.getEntry(req, trx, entry_id)
-        .then(ent => {
-          entry = ent
-          return ChargeCommon.getChargeById(req, trx, entry.charge_id)
-        })
-        .then(chrg => {
-          charge = chrg
-          return module.exports.doClearResult(req, trx, entry_id)
-        })
-        .then(() => {
-          let gpx = req.files.file.data.toString('utf8')
-          unfiltered = extractGPX(gpx)
-          let rows = unfiltered.filter(v=>v.datetime.diff(DateTime.fromISO(charge.charge_date),'days').days<1)
-          return GPSCommon.importRaw(req, trx, entry_id, rows, 0, 0)
-        })
-        .then(cnts => {
-          counts = cnts
-
-          return Knex('entry')
-            .update({
-              processing_status: counts.clean_count > 0 ? 'CLEAN':'NO_GPS', 
-              gps_source_ref: counts.clean_count > 0 ? 'GPX' : null,
-              geotab_device_id: null
-            })
-            .where({entry_id: entry_id})
-            .transacting(trx)    
-        })
-        .then(() => {
-          if (counts.clean_count > 0 ) {
-            return module.exports.doCalculateCheckins(req, trx, entry_id)
-          }
-        })  
-        .then(trx.commit)
-        .catch(trx.rollback)
-      })
-      .then(() => {
-        Common.debug(null, 'importGpx', JSON.stringify(counts))
-        res.send(counts)
-      })
-      .catch(err => {
-        Common.error(req, 'importGpx', err)
-        res.status(500).send({ error: 'an error has occured importing the raw gps data: ' + err })
-      })
-
-  },
-
   clearResult(req, res) {
     Common.debug(req, 'clearResult')
 
@@ -675,8 +802,11 @@ module.exports = {
       .then(ents => {
         entry = ents[0]
         // if file exists on disk, delete it
-        if (fs.existsSync('./../frontend/public/charges/kml/' + entry.kml)) {
-          fs.unlinkSync('./../frontend/public/charges/kml/' + entry.kml)
+        const dirPath = path.join(__dirname, './../../public/charges/kml/')
+        console.log('dirPath', dirPath)
+
+        if (fs.existsSync(dirPath + entry.kml)) {
+          fs.unlinkSync(dirPath + entry.kml)
         }
 
         return Knex('entry')
@@ -871,7 +1001,7 @@ module.exports = {
       .then(chrg=>{
         charge = chrg
 
-        startTime = DateTime.fromISO(charge.charge_date + 'T' + charge.start_time).minus({minutes: 15})
+        startTime = DateTime.fromISO(charge.charge_date + 'T' + charge.start_time)
         endTime = DateTime.fromISO(charge.charge_date + 'T' + charge.end_time)
         if (entry.late_finish_min>0) {
           endTime = endTime.plus({minutes: entry.late_finish_min})
@@ -1036,11 +1166,8 @@ module.exports = {
                   oEntry.checkins_consistent = true    
                   oEntry.processing_status = 'LEGS'
                   oEntry.checkins_inconsistent_message = ''
-                  oEntry.result_status = legs.length == charge.checkpoint_count?'COMPLETE':'DNF ' + legs.length
-
-                  return module.exports.doUpdateDistances(req, trx, entryId)
-                })
-                .then(() => {
+                  oEntry.result_status = legs.length == charge.checkpoint_count ? 'COMPLETE':'DNF ' + legs.length
+                  
                   resolve(oEntry)
                 })
                 .catch(err => {
@@ -1061,9 +1188,16 @@ module.exports = {
             .where({entry_id: entryId})
             .transacting(trx)         
         })
-        .then(()=>{
-          const kml = require('../services/kml')
-          return kml.entryKml(req, trx, entryId)
+        .then(() => {
+          if (result.processing_status && result.processing_status == 'LEGS') {
+            return module.exports.doUpdateDistances(req, trx, entryId)
+          }
+        })
+        .then(() => {
+          if (result.processing_status && result.processing_status == 'LEGS') {
+            const kml = require('../services/kml')
+            return kml.entryKml(req, trx, entryId)
+          }
         })
         .then(trx.commit)
         .catch(trx.rollback)            

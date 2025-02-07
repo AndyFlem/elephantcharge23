@@ -1,20 +1,80 @@
 const Knex = require('./db')
-const Luxon = require('luxon')
-const DateTime = Luxon.DateTime
 const Common = require('../controllers/CommonDebug')('KML')
 const fs = require('fs')
-const { create, convert, fragment } = require('xmlbuilder2')
+const path = require('path')
+const { create } = require('xmlbuilder2')
 
 const EntryController = require('../controllers/EntryController')
 const ChargeCommon = require('../controllers/ChargeCommon')
 
 module.exports = {
+   chargeKml (req, trx, chargeId) {
+    Common.debug(null, 'chargeKml', chargeId)
+    let entries
+    let charge
+    let kml, kmlDocument, kmlEntries
+    let kmlName
+
+    return Knex('v_charge')
+      .where({'charge_id': chargeId})
+      .select()
+      .transacting(trx)
+      .then(charges=>{
+        charge=charges[0]
+        
+        return Knex('v_entry')
+          .where({'charge_id': chargeId})
+          .orderBy('car_no')
+          .select()
+          .transacting(trx)
+      })
+      .then(ents=>{
+        entries = ents
+
+        return module.exports.kmlHeader(req, trx, chargeId)
+      })
+      .then(ret => {
+        kml=ret.kml
+        kmlDocument=ret.kmlDocument
+        
+        kmlEntries = kmlDocument.ele('Folder')
+          .ele('name').txt('Entries').up()
+          .ele('open').txt('1').up()            
+
+        req.query.geometry='kml'
+        return Promise.all(entries.map(entry => {
+          if (entry.processing_status=='LEGS'){
+            return module.exports.addEntry(req, trx, entry, kmlDocument, kmlEntries)
+          }
+        }))
+      })
+      .then(() => {
+
+        let out = kml.end({ prettyPrint: true })
+        
+          // Create the directory if it doesn't exist
+          const dirPath = path.join(__dirname, './../../public/charges/kml/')
+          console.log('dirPath', dirPath + charge.charge_ref)
+          if (!fs.existsSync(dirPath + charge.charge_ref)){
+            fs.mkdirSync(dirPath + charge.charge_ref, { recursive: false });
+          }
+
+        kmlName = charge.charge_ref + '/EC_' + charge.charge_ref + '.kml'
+        fs.writeFileSync(dirPath + '/' + kmlName, out)
+        return Knex('charge')
+          .where({charge_id: chargeId})
+          .update({kml: kmlName})
+          .transacting(trx)
+      })
+      .then(() => {
+        return {kml: kmlName}
+      })
+    },
     entryKml (req, trx, entryId) {
       Common.debug(null, 'entryKml', entryId)
       let entry
       let charge
-      let checkpoints
-      let kml,kmlDocument,kmlEntries,kmlEntry
+      let kml, kmlDocument, kmlEntries
       let kmlName
 
       return Knex('v_entry')
@@ -41,12 +101,16 @@ module.exports = {
         .then(() => {
 
           let out = kml.end({ prettyPrint: true })
-          // create folder if it doesnt exist
-          if (!fs.existsSync('./../public/charges/kml/' + charge.charge_ref)){
-            fs.mkdirSync('./../public/charges/kml/' + charge.charge_ref)
-          }
-          kmlName = charge.charge_ref + '/' + entry.car_no + '_' + entry.entry_name + '.kml'
-          fs.writeFileSync('./../public/charges/kml/' +  kmlName, out)
+          
+            // Create the directory if it doesn't exist
+            const dirPath = path.join(__dirname, './../../public/charges/kml/')
+            console.log('dirPath', dirPath + charge.charge_ref)
+            if (!fs.existsSync(dirPath + charge.charge_ref)){
+              fs.mkdirSync(dirPath + charge.charge_ref, { recursive: false });
+            }
+
+          kmlName =  + charge.charge_ref + '/' + entry.car_no + '_' + entry.entry_name + '.kml'
+          fs.writeFileSync(dirPath + '/' + kmlName, out)
           return Knex('entry')
             .where({entry_id: entryId})
             .update({kml: kmlName})
@@ -104,19 +168,25 @@ module.exports = {
     addEntry(req, trx, entry, kmlDocument, kmlEntries) {
       return EntryController.doGetLegs(req, trx, entry.entry_id)
         .then(legs => {
+          let colCode
+          if (entry.color){
+            colCode = entry.color.slice(5,7)+ entry.color.slice(3,5)+ entry.color.slice(1,3)
+          } else {
+            colCode = 'FFFFFF'
+          }
           kmlDocument.ele('Style').att('id', 'entry_' + entry.entry_id)
             .ele('LineStyle')
-              .ele('color').txt('FF' + entry.color.slice(5,7)+ entry.color.slice(3,5)+ entry.color.slice(1,3)).up()
+              .ele('color').txt('FF' + colCode).up()
               .ele('width').txt('4').up().up()
     
           kmlEntry=kmlEntries.ele('Folder')
-            .ele('name').txt(entry.entry_name).up()
+            .ele('name').txt(entry.car_no + ' ' + entry.entry_name).up()
             .ele('open').txt('0').up()
 
           for (const leg of legs) {
             const legobj = create(leg.leg_line)
             kmlEntry.ele('Placemark')
-              .ele('name').txt(leg.checkpoint1_name + ' to ' + leg.checkpoint2_name).up()
+              .ele('name').txt(entry.car_no + ' ' + leg.checkpoint1_name + ' to ' + leg.checkpoint2_name).up()
               .ele('styleUrl').txt('#entry_' + entry.entry_id).up()
               .import(legobj)
           }

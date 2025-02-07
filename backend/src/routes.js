@@ -32,6 +32,7 @@ module.exports = (app) => {
   app.get(prefix + '/charge/:charge_id/award_results', ChargeController.awardResults)
   
   app.get(prefix + '/charge/:charge_id/entries', EntryController.index)
+  app.get(prefix + '/charge/:charge_id/kml', ChargeController.kml)
 
   app.get(prefix + '/entry/:entry_id', EntryController.show)
   app.get(prefix + '/entry/:entry_id/geometry', EntryController.showGeometry)
@@ -52,8 +53,10 @@ module.exports = (app) => {
   app.put(prefix + '/entry/:entry_id/update_checkpoint_card', EntryController.updateCheckpointCard)
   app.delete(prefix + '/entry/:entry_id/checkin/:checkin_id', EntryController.deleteCheckin)
 
+  app.post(prefix + '/entry/:entry_id/importTeltonikaDB', EntryController.importTeltonikaDB)
   app.post(prefix + '/entry/:entry_id/importGeotab', EntryController.importGeotab)
   app.post(prefix + '/entry/:entry_id/importGpx', EntryController.importGpx)
+  app.post(prefix + '/entry/:entry_id/importTeltonikaBin', EntryController.importTeltonikaBin)
   app.get(prefix + '/entry/:entry_id/kml', EntryController.kml)
   
   app.get(prefix + '/leg/:leg_id/entries', EntryController.indexForLeg)

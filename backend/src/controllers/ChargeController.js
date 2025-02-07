@@ -61,7 +61,28 @@ module.exports = {
         res.status(500).send({ error: 'an error has occured getting the car numbers: ' + err })
       })
   },
-  
+  kml(req, res) {
+    Common.debug(req, 'kml')
+
+    const kml = require('../services/kml')
+    let response
+
+    Knex.transaction(function (trx) {
+      return kml.chargeKml(req, trx, req.params.charge_id)  
+        .then(resp => {
+          response = resp
+        })
+        .then(trx.commit)
+        .catch(trx.rollback)
+    })
+    .then(() => {
+      res.send(response)
+    })
+    .catch(err => {
+      Common.error(req, 'kml', err)
+      res.status(500).send({ error: 'An error has occured trying fetch the kml for the charge: ' + err })
+    })
+  },  
   awards(req, res) {
     Common.debug(req, 'awards')
 

@@ -24,9 +24,8 @@
       info: null,
       offset24hr: true
     },
-    gpx: {
-      file: null
-    },
+    teltonikabinFile: null,
+    gpxFile: null,
     offsetMinutes: 0
   })
   const alerts = reactive({
@@ -91,10 +90,33 @@
       .catch(err => {alert('error', 'Error', JSON.stringify(err.message))})
   }
 
+  function importTeltonika() {
+    axiosPlain.post('/entry/' + props.entry.entry_id + '/importTeltonikaDB',{imei: props.entry.imei})
+      .then(counts => {
+        emit('entryGpsUpdated', counts.data.count)
+        hide()
+      })
+      .catch(err => {alert('error', 'Error', JSON.stringify(err.message))})
+  }
+
+  function binSelected() {
+    //state.uploadResult = ''
+    const formData = new FormData()
+    formData.append('file', state.teltonikabinFile)
+    formData.append('imei', props.entry.imei)
+    
+    axiosUpload.post('/entry/' + props.entry.entry_id + '/importTeltonikaBin', formData)
+      .then(counts => {
+        emit('entryGpsUpdated', counts.data.count)
+        state.file=null
+        hide()
+      })
+  }
+
   function gpxSelected() {
     //state.uploadResult = ''
     const formData = new FormData()
-    formData.append('file', state.file);
+    formData.append('file', state.gpxFile);
     axiosUpload.post('/entry/' + props.entry.entry_id + '/importGpx', formData)
       .then(counts => {
         emit('entryGpsUpdated', counts.data.count)
@@ -170,10 +192,17 @@
           </v-col>         
         </v-row>
         <v-row no-gutters><v-col><v-divider/></v-col></v-row>
-        <v-row>
+        <v-row v-if="props.entry.imei">
+          <v-col cols="12">
+            IMEI: {{ props.entry.imei }}
+          </v-col>
+          <v-col cols="12">
+            <v-btn @click="importTeltonika">Import Live Teltonika</v-btn>
+          </v-col>
           <v-col cols="12">
             <v-file-input
-              v-model="state.teltonikabin"       
+              v-model="state.teltonikabinFile"
+              @update:model-value="binSelected"
               accept=".bin"
               density="compact"
               variant="outlined"
@@ -186,7 +215,7 @@
         <v-row>
           <v-col cols="12">
             <v-file-input
-              v-model="state.file"
+              v-model="state.gpxFile"
               @update:model-value="gpxSelected"
               accept=".gpx"
               density="compact"
