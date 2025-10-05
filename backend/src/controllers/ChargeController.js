@@ -68,7 +68,7 @@ module.exports = {
     let response
 
     Knex.transaction(function (trx) {
-      return kml.chargeKml(req, trx, req.params.charge_id)  
+      return kml.chargeKml(req, trx, req.params.charge_id, req.query.animation?true:false)  
         .then(resp => {
           response = resp
         })

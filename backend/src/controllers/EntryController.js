@@ -285,6 +285,16 @@ module.exports = {
       res.status(500).send({ error: 'An error has occured trying fetch the distances for the entry: ' + err })
     })
   },
+  doGetLegPoints(req, trx, entryId) {
+    Common.debug(null, 'doGetLegPoints')
+    
+    return Knex.raw('SELECT gps_timestamp, st_x(ST_Transform(location_prj, 4326)) as lon, st_y(ST_Transform(location_prj, 4326)) as lat from gps_clean WHERE entry_id = ? ORDER BY gps_timestamp', [entryId])
+      .transacting(trx)
+      .then(points => {
+        //console.log('points', points.rows)
+        return points.rows
+      })
+  },
 
   // =======================
   // IMPORTERS
@@ -1130,6 +1140,7 @@ module.exports = {
         })
         .then(chks => {
           checkins = chks
+          console.log("Checkins: ", checkins.length)
           if (checkins[0].checkpoint_id != entry.starting_checkpoint_id) { 
             msgs.push('Unexpected starting checkpoint: ' + checkins[0].sponsor_name)
           }
