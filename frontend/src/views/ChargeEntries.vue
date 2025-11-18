@@ -28,8 +28,9 @@
   }
 
   const sortStatus = (value) => {
-    if (value.result_status) {
-      if (value.result_status == 'COMPLETE') { return value.distance_total_competition } else { return 2000 }
+    console.log('sortStatus', value)
+    if (value.status) {
+      if (value.status == 'COMPLETE') { return value.distance_total_competition } else { return 2000 }
     } else { return 3000 }
   }
 

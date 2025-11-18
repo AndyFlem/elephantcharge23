@@ -22,7 +22,6 @@ module.exports = {
         res.status(500).send({ error: 'an error has occured getting the charges: ' + err })
       })
   },
-  
   show (req, res) {
     Common.debug(req, 'show')
 
